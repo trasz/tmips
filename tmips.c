@@ -20,22 +20,22 @@
 			fprintf(stdout, "$%d,", REG);						\
 	} while (0)
 
+#define	TRACE_IMM_REG(REG)	do {								\
+		if (register_name(REG) != NULL)							\
+			fprintf(stdout, "%d(%s)", immediate, register_name(REG));		\
+		else										\
+			fprintf(stdout, "%d($%d)", immediate, REG);				\
+	} while (0)
+
+#define	TRACE_IMM()	do {									\
+		fprintf(stdout, "%d", immediate);						\
+	} while (0)
+
 static const char *register_names[32] = {
 	"zero", "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
 	"a4",   "a5",   "a6",   "a7",   "t0",   "t1",   "t2",   "t3",
 	"s0",   "s1",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
 	"t8",   "t9",   "k0",   "k1",   "gp",   "sp",   "s8",   "ra"
-};
-
-static const char *op_names[64] = {
-	/* 0 */ "spec", "bcond","j",    "jal",  "beq",  "bne",  "blez", "bgtz",
-	/* 8 */ "addi", "addiu","slti", "sltiu","andi", "ori",  "xori", "lui",
-	/*16 */ "cop0", "cop1", "cop2", "cop3", "beql", "bnel", "blezl","bgtzl",
-	/*24 */ "daddi","daddiu","ldl", "ldr",  "op34", "op35", "op36", "op37",
-	/*32 */ "lb",   "lh",   "lwl",  "lw",   "lbu",  "lhu",  "lwr",  "lwu",
-	/*40 */ "sb",   "sh",   "swl",  "sw",   "sdl",  "sdr",  "swr",  "cache",
-	/*48 */ "ll",   "lwc1", "lwc2", "lwc3", "lld",  "ldc1", "ldc2", "ld",
-	/*56 */ "sc",   "swc1", "swc2", "swc3", "scd",  "sdc1", "sdc2", "sd"
 };
 
 static const char *
@@ -45,15 +45,6 @@ register_name(int i)
 	if (i < 0 || (unsigned long)i >= nitems(register_names))
 		return (NULL);
 	return (register_names[i]);
-}
-
-static const char *
-op_name(int i)
-{
-
-	if (i < 0 || (unsigned long)i >= nitems(op_names))
-		return ("?");
-	return (op_names[i]);
 }
 
 /*
@@ -191,6 +182,7 @@ run(int *binary)
 		switch (opcode) {
 		case OPCODE_SPECIAL:
 			funct = instruction & 0x1F;
+
 			switch (funct) {
 			case FUNCT_SPECIAL_SLL:
 				TRACE_OPCODE("sll");
@@ -409,26 +401,31 @@ run(int *binary)
 			TRACE_OPCODE("addi");
 			TRACE_REG(rt);
 			TRACE_REG(rs);
+			TRACE_IMM();
 			break;
 		case OPCODE_ADDIU:
 			TRACE_OPCODE("addiu");
 			TRACE_REG(rt);
 			TRACE_REG(rs);
+			TRACE_IMM();
 			break;
 		case OPCODE_SLTI:
 			TRACE_OPCODE("slti");
 			TRACE_REG(rt);
 			TRACE_REG(rs);
+			TRACE_IMM();
 			break;
 		case OPCODE_SLTIU:
 			TRACE_OPCODE("sltiu");
 			TRACE_REG(rt);
 			TRACE_REG(rs);
+			TRACE_IMM();
 			break;
 		case OPCODE_ANDI:
 			TRACE_OPCODE("andi");
 			TRACE_REG(rt);
 			TRACE_REG(rs);
+			TRACE_IMM();
 			break;
 		case OPCODE_ORI:
 			TRACE_OPCODE("ori");
@@ -459,14 +456,17 @@ run(int *binary)
 		case OPCODE_LW:
 			TRACE_OPCODE("lw");
 			TRACE_REG(rt);
+			TRACE_IMM();
 			break;
 		case OPCODE_LBU:
 			TRACE_OPCODE("lbu");
 			TRACE_REG(rt);
+			TRACE_IMM_REG(rs);
 			break;
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
 			TRACE_REG(rt);
+			TRACE_IMM();
 			break;
 		case OPCODE_LWR:
 			TRACE_OPCODE("lwr");
@@ -475,6 +475,7 @@ run(int *binary)
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
 			TRACE_REG(rt);
+			TRACE_IMM();
 			break;
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
@@ -487,6 +488,7 @@ run(int *binary)
 		case OPCODE_SW:
 			TRACE_OPCODE("sw");
 			TRACE_REG(rt);
+			TRACE_IMM();
 			break;
 		case OPCODE_SWR:
 			TRACE_OPCODE("swr");
@@ -498,6 +500,7 @@ run(int *binary)
 		case OPCODE_LL:
 			TRACE_OPCODE("ll");
 			TRACE_REG(rt);
+			TRACE_IMM_REG(rs);
 			break;
 		case OPCODE_LWC1:
 			TRACE_OPCODE("lwc1");
@@ -519,7 +522,7 @@ run(int *binary)
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
 			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_IMM_REG(rs);
 			break;
 		case OPCODE_SWC1:
 			TRACE_OPCODE("swc1");
