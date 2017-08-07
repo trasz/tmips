@@ -9,8 +9,9 @@
 
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
-#define	TRACE_OPCODE(STR)	do {									\
-		fprintf(stdout, "\n%8llx:\t%08x\t%-7s ", (unsigned long long)binary, instruction, STR);	\
+#define	TRACE_OPCODE(STR)	do {								\
+		fprintf(stdout, "\n%8llx:\t%08x\t%-7s ",					\
+		    (unsigned long long)pc, ntohl(instruction), STR);			\
 	} while (0)
 
 #define	TRACE_REG(REG)	do {									\
@@ -20,6 +21,10 @@
 			fprintf(stdout, "$%d,", REG);						\
 	} while (0)
 
+#define	TRACE_RD()	TRACE_REG(rd)
+#define	TRACE_RS()	TRACE_REG(rs)
+#define	TRACE_RT()	TRACE_REG(rt)
+
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (register_name(REG) != NULL)							\
 			fprintf(stdout, "%d(%s)", immediate, register_name(REG));		\
@@ -27,8 +32,14 @@
 			fprintf(stdout, "%d($%d)", immediate, REG);				\
 	} while (0)
 
+#define	TRACE_IMM_RS()	TRACE_IMM_REG(rs)
+
 #define	TRACE_IMM()	do {									\
 		fprintf(stdout, "%d", immediate);						\
+	} while (0)
+
+#define	TRACE_JUMP()	do {									\
+		fprintf(stdout, "%x", jump);							\
 	} while (0)
 
 static const char *register_names[32] = {
@@ -100,6 +111,7 @@ register_name(int i)
 #define	FUNCT_SPECIAL_TEQ	0x34
 
 #define	FUNCT_SPECIAL_TNE	0x36
+#define	FUNCT_SPECIAL_DSRA32	0x3F
 
 #define	OPCODE_J	0x02
 #define	OPCODE_JAL	0x03
@@ -118,6 +130,8 @@ register_name(int i)
 #define	OPCODE_ORI	0x0D
 #define	OPCODE_XORI	0x0E
 #define	OPCODE_LUI	0x0F
+
+#define	OPCODE_BEQL	0x14
 
 #define	OPCODE_LB	0x20
 #define	OPCODE_LH	0x21
@@ -152,17 +166,18 @@ register_name(int i)
 #define	OPCODE_SDC2	0x3E
 
 static int
-run(int *binary)
+run(int *pc)
 {
 	// CPU context.
 	uint32_t reg[32];
 
 	// Temporaries.
 	uint32_t rs, rt, rd, instruction, jump, opcode, funct;
+	uint16_t uimmediate;
 	int16_t immediate;
 
 	for (;;) {
-		instruction = *binary;
+		instruction = *pc;
 
 		opcode = (instruction & (0x3F << 26)) >> 26;
 
@@ -176,64 +191,64 @@ run(int *binary)
 
 #if 0
 		fprintf(stdout, "%8llx:\t%08x\t%s (%#x), rs %s ($%d), rt %s ($%d), rd %s ($%d), imm %d, addr %#x\n",
-		    (unsigned long long)binary, instruction, op_name(opcode), opcode, register_name(rs), rs, register_name(rt), rt, register_name(rd), rd, immediate, jump);
+		    (unsigned long long)pc, instruction, op_name(opcode), opcode, register_name(rs), rs, register_name(rt), rt, register_name(rd), rd, immediate, jump);
 #endif
 
 		switch (opcode) {
 		case OPCODE_SPECIAL:
-			funct = instruction & 0x1F;
+			funct = instruction & 0x3F;
 
 			switch (funct) {
 			case FUNCT_SPECIAL_SLL:
 				TRACE_OPCODE("sll");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SRL:
 				TRACE_OPCODE("srl");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SRA:
 				TRACE_OPCODE("sra");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SLLV:
 				TRACE_OPCODE("sllv");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SRLV:
 				TRACE_OPCODE("srlv");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
-				TRACE_REG(rs);
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_RS();
 				break;
 			case FUNCT_SPECIAL_SRAV:
 				TRACE_OPCODE("srav");
-				TRACE_REG(rd);
-				TRACE_REG(rt);
-				TRACE_REG(rs);
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_RS();
 				break;
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
-				TRACE_REG(rs);
+				TRACE_RS();
 				break;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
 				break;
 			case FUNCT_SPECIAL_MOVZ:
 				TRACE_OPCODE("movz");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_MOVN:
 				TRACE_OPCODE("movn");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
@@ -246,269 +261,294 @@ run(int *binary)
 				break;
 			case FUNCT_SPECIAL_MFHI:
 				TRACE_OPCODE("mfhi");
-				TRACE_REG(rd);
+				TRACE_RD();
 				break;
 			case FUNCT_SPECIAL_MTHI:
 				TRACE_OPCODE("mthi");
-				TRACE_REG(rs);
+				TRACE_RS();
 				break;
 			case FUNCT_SPECIAL_MFLO:
 				TRACE_OPCODE("mflo");
-				TRACE_REG(rd);
+				TRACE_RD();
 				break;
 			case FUNCT_SPECIAL_MTLO:
 				TRACE_OPCODE("mtlo");
-				TRACE_REG(rs);
+				TRACE_RS();
 				break;
 			case FUNCT_SPECIAL_MULT:
 				TRACE_OPCODE("mult");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_MULTU:
 				TRACE_OPCODE("multu");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_DIV:
 				TRACE_OPCODE("div");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_DIVU:
 				TRACE_OPCODE("divu");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_ADD:
 				TRACE_OPCODE("add");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				reg[rd] = reg[rs] + reg[rt];
 				break;
 			case FUNCT_SPECIAL_ADDU:
 				TRACE_OPCODE("addu");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				reg[rd] = reg[rs] + reg[rt];
 				break;
 			case FUNCT_SPECIAL_SUB:
 				TRACE_OPCODE("sub");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SUBU:
 				TRACE_OPCODE("subu");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_AND:
 				TRACE_OPCODE("and");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				reg[rd] = reg[rs] & reg[rt];
 				break;
 			case FUNCT_SPECIAL_OR:
 				TRACE_OPCODE("or");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_XOR:
 				TRACE_OPCODE("xor");
 				break;
 			case FUNCT_SPECIAL_NOR:
 				TRACE_OPCODE("nor");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SLT:
 				TRACE_OPCODE("slt");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_SLTU:
 				TRACE_OPCODE("sltu");
-				TRACE_REG(rd);
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TGE:
 				TRACE_OPCODE("tge");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TGEU:
 				TRACE_OPCODE("tgeu");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TLT:
 				TRACE_OPCODE("tlt");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TLTU:
 				TRACE_OPCODE("tltu");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TEQ:
 				TRACE_OPCODE("teq");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
 				break;
 			case FUNCT_SPECIAL_TNE:
 				TRACE_OPCODE("tne");
-				TRACE_REG(rs);
-				TRACE_REG(rt);
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSRA32:
+				TRACE_OPCODE("dsra32");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_IMM();
 				break;
 			default:
 				TRACE_OPCODE("SPECIAL");
+				fprintf(stdout, "(unknown opcode %x, function %x)", opcode, funct);
 				break;
 			}
 			break;
 		case OPCODE_J:
 			TRACE_OPCODE("j");
+			TRACE_JUMP();
 			break;
 		case OPCODE_JAL:
 			TRACE_OPCODE("jal");
-			TRACE_REG(rs);
+			TRACE_RS();
 			break;
 		case OPCODE_BEQ:
 			TRACE_OPCODE("beq");
-			TRACE_REG(rs);
-			TRACE_REG(rt);
+beq:
+			TRACE_RS();
+			TRACE_RT();
+			TRACE_JUMP();
+			if (reg[rs] != reg[rt])
+				break;
+			//pc += jump << 2;
 			break;
 		case OPCODE_BNE:
 			TRACE_OPCODE("bne");
-			TRACE_REG(rs);
-			TRACE_REG(rt);
+			TRACE_RS();
+			TRACE_RT();
 			break;
 		case OPCODE_BLEZ:
 			TRACE_OPCODE("blez");
-			TRACE_REG(rs);
+			TRACE_RS();
+			TRACE_IMM();
 			break;
 		case OPCODE_BGTZ:
 			TRACE_OPCODE("bgtz");
-			TRACE_REG(rs);
+			TRACE_RS();
 			break;
 		case OPCODE_ADDI:
 			TRACE_OPCODE("addi");
-			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
+			reg[rt] = reg[rs] + immediate;
 			break;
 		case OPCODE_ADDIU:
 			TRACE_OPCODE("addiu");
-			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
+			reg[rt] = reg[rs] + immediate;
 			break;
 		case OPCODE_SLTI:
 			TRACE_OPCODE("slti");
-			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
 			break;
 		case OPCODE_SLTIU:
 			TRACE_OPCODE("sltiu");
-			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
 			break;
 		case OPCODE_ANDI:
 			TRACE_OPCODE("andi");
-			TRACE_REG(rt);
-			TRACE_REG(rs);
+			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
+			uimmediate = immediate;
+			uimmediate = (immediate << 16) >> 16;
+			reg[rt] = reg[rs] & uimmediate;
 			break;
 		case OPCODE_ORI:
 			TRACE_OPCODE("ori");
-			TRACE_REG(rd);
-			TRACE_REG(rs);
+			TRACE_RD();
+			TRACE_RS();
 			break;
 		case OPCODE_XORI:
 			TRACE_OPCODE("xori");
-			TRACE_REG(rd);
-			TRACE_REG(rs);
-			TRACE_REG(rt);
+			TRACE_RD();
+			TRACE_RS();
+			TRACE_RT();
 			break;
 		case OPCODE_LUI:
 			TRACE_OPCODE("lui");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
+		case OPCODE_BEQL:
+			TRACE_OPCODE("beql");
+			goto beq;
 		case OPCODE_LB:
 			TRACE_OPCODE("lb");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_LH:
 			TRACE_OPCODE("lh");
 			break;
 		case OPCODE_LWL:
 			TRACE_OPCODE("lwl");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_LW:
 			TRACE_OPCODE("lw");
-			TRACE_REG(rt);
+			TRACE_RT();
 			TRACE_IMM();
 			break;
 		case OPCODE_LBU:
 			TRACE_OPCODE("lbu");
-			TRACE_REG(rt);
-			TRACE_IMM_REG(rs);
+			TRACE_RT();
+			TRACE_IMM_RS();
 			break;
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
-			TRACE_REG(rt);
+			TRACE_RT();
 			TRACE_IMM();
 			break;
 		case OPCODE_LWR:
 			TRACE_OPCODE("lwr");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
-			TRACE_REG(rt);
+			TRACE_RT();
 			TRACE_IMM();
 			break;
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_SWL:
 			TRACE_OPCODE("swl");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_SW:
 			TRACE_OPCODE("sw");
-			TRACE_REG(rt);
+			TRACE_RT();
 			TRACE_IMM();
 			break;
 		case OPCODE_SWR:
 			TRACE_OPCODE("swr");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_CACHE:
 			TRACE_OPCODE("cache");
 			break;
 		case OPCODE_LL:
 			TRACE_OPCODE("ll");
-			TRACE_REG(rt);
-			TRACE_IMM_REG(rs);
+			TRACE_RT();
+			TRACE_IMM_RS();
 			break;
 		case OPCODE_LWC1:
 			TRACE_OPCODE("lwc1");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_LWC2:
 			TRACE_OPCODE("lwc2");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_PREF:
 			TRACE_OPCODE("pref");
@@ -521,16 +561,16 @@ run(int *binary)
 			break;
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
-			TRACE_REG(rt);
-			TRACE_IMM_REG(rs);
+			TRACE_RT();
+			TRACE_IMM_RS();
 			break;
 		case OPCODE_SWC1:
 			TRACE_OPCODE("swc1");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_SWC2:
 			TRACE_OPCODE("swc2");
-			TRACE_REG(rt);
+			TRACE_RT();
 			break;
 		case OPCODE_SDC1:
 			TRACE_OPCODE("sdc1");
@@ -544,7 +584,7 @@ run(int *binary)
 			break;
 		}
 
-		binary++;
+		pc++;
 	}
 
 	return (0);
