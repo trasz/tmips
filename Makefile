@@ -1,4 +1,4 @@
-CFLAGS+=	-Wall -Wextra -O0 -ggdb -lelf
+CFLAGS+=	-Wall -pedantic -Wextra -O0 -ggdb -lelf
 
 default: all
 

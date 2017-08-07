@@ -6,41 +6,58 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <libelf.h>
+
+#define	STACK_PAGES	3
+#define	TRACE
 
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
+#ifdef TRACE
 #define	TRACE_OPCODE(STR)	do {								\
-		fprintf(stdout, "\n%12llx:\t%08x\t%-7s ",					\
+		fprintf(stderr, "\n%12llx:\t%08x\t%-7s ",					\
 		    (unsigned long long)pc, instruction, STR);					\
 	} while (0)
 
 #define	TRACE_REG(REG)	do {									\
 		if (register_name(REG) != NULL)							\
-			fprintf(stdout, "%s,", register_name(REG));				\
+			fprintf(stderr, "%s,", register_name(REG));				\
 		else										\
-			fprintf(stdout, "$%d,", REG);						\
+			fprintf(stderr, "$%d,", REG);						\
 	} while (0)
 
 #define	TRACE_RD()	TRACE_REG(rd)
 #define	TRACE_RS()	TRACE_REG(rs)
 #define	TRACE_RT()	TRACE_REG(rt)
 
+#define	TRACE_RESULT_REG(REG)	do {								\
+		if (register_name(REG) != NULL)							\
+			fprintf(stderr, "\t# %s := %ld (%#lx)", register_name(REG), reg[REG], reg[REG]);	\
+		else										\
+			fprintf(stderr, "\t# $%d := %ld (%#lx)", REG, reg[REG], reg[REG]);		\
+	} while (0)
+
+#define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
+#define	TRACE_RESULT_RS()	TRACE_RESULT_REG(rs)
+#define	TRACE_RESULT_RT()	TRACE_RESULT_REG(rt)
+
+
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (register_name(REG) != NULL)							\
-			fprintf(stdout, "%d(%s)", immediate, register_name(REG));		\
+			fprintf(stderr, "%d(%s)", immediate, register_name(REG));		\
 		else										\
-			fprintf(stdout, "%d($%d)", immediate, REG);				\
+			fprintf(stderr, "%d($%d)", immediate, REG);				\
 	} while (0)
 
 #define	TRACE_IMM_RS()	TRACE_IMM_REG(rs)
 
 #define	TRACE_IMM()	do {									\
-		fprintf(stdout, "%d", immediate);						\
+		fprintf(stderr, "%d", immediate);						\
 	} while (0)
 
 #define	TRACE_JUMP()	do {									\
-		fprintf(stdout, "%x", jump);							\
+		fprintf(stderr, "%x", jump);							\
 	} while (0)
 
 static const char *register_names[32] = {
@@ -58,6 +75,17 @@ register_name(int i)
 		return (NULL);
 	return (register_names[i]);
 }
+
+#else /* !TRACE */
+#define TRACE_OPCODE(X)
+#define TRACE_RD()
+#define TRACE_RS()
+#define TRACE_RT()
+#define TRACE_IMM_REG(X)
+#define TRACE_IMM_RS()
+#define TRACE_IMM()
+#define TRACE_JUMP()
+#endif /* !TRACE */
 
 /*
  * See the Green Sheet, http://www-inst.eecs.berkeley.edu/~cs61c/resources/MIPS_Green_Sheet.pdf
@@ -189,16 +217,32 @@ register_name(int i)
 #define	OPCODE_SDC2	0x3e
 #define	OPCODE_SD	0x3f
 
+static int64_t
+initial_stack_pointer(void)
+{
+	char foo[STACK_PAGES * 4096];
+	int64_t bar;
+
+	foo[0] = 42;
+	bar = 42;
+	return ((int64_t)&bar);
+}
+
 static int
 run(int *pc)
 {
 	// CPU context.
-	uint64_t reg[32];
+	int64_t reg[32];
 
 	// Temporaries.
 	uint32_t rs, rt, rd, instruction, jump, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
+
+	memset(reg, 0, sizeof(reg));
+	reg[0] = 0;
+	reg[25] = (int64_t)pc;
+	reg[29] = initial_stack_pointer();
 
 	for (;;) {
 		instruction = ntohl(*pc);
@@ -212,11 +256,6 @@ run(int *pc)
 		immediate = (instruction << 16) >> 16;
 
 		jump = instruction & 0x3FFFFFF;
-
-#if 0
-		fprintf(stdout, "%8llx:\t%08x\t%s (%#x), rs %s ($%d), rt %s ($%d), rd %s ($%d), imm %d, addr %#x\n",
-		    (unsigned long long)pc, instruction, op_name(opcode), opcode, register_name(rs), rs, register_name(rt), rt, register_name(rd), rd, immediate, jump);
-#endif
 
 		switch (opcode) {
 		case OPCODE_SPECIAL:
@@ -389,6 +428,7 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				reg[rd] = reg[rs] & reg[rt];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_OR:
 				TRACE_OPCODE("or");
@@ -428,6 +468,8 @@ run(int *pc)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = reg[rs] + reg[rt];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSUB:
 				TRACE_OPCODE("dsub");
@@ -506,7 +548,7 @@ run(int *pc)
 				break;
 			default:
 				TRACE_OPCODE("SPECIAL");
-				fprintf(stdout, "(opcode %#x, function %#x)", opcode, funct);
+				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
 				break;
 			}
 			break;
@@ -555,6 +597,7 @@ beq:
 			TRACE_RS();
 			TRACE_IMM();
 			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SLTI:
 			TRACE_OPCODE("slti");
@@ -591,6 +634,9 @@ beq:
 		case OPCODE_LUI:
 			TRACE_OPCODE("lui");
 			TRACE_RT();
+			TRACE_IMM();
+			reg[rt] = (int32_t)immediate << 16;
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_BEQL:
 			TRACE_OPCODE("beql");
@@ -607,6 +653,7 @@ beq:
 			TRACE_RT();
 			TRACE_IMM();
 			reg[rt] = reg[rs] + immediate;
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LB:
 			TRACE_OPCODE("lb");
@@ -689,6 +736,8 @@ beq:
 			TRACE_OPCODE("ld");
 			TRACE_RT();
 			TRACE_IMM_RS();
+			reg[rt] = *((char *)reg[rs] + immediate);
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
@@ -713,10 +762,11 @@ beq:
 			TRACE_OPCODE("sd");
 			TRACE_RT();
 			TRACE_IMM_RS();
+			*((int64_t *)((char *)(reg[rs]) + immediate)) = reg[rt];
 			break;
 		default:
 			TRACE_OPCODE("UNKNOWN");
-			fprintf(stdout, "(opcode %#x, function %#x)", opcode, funct);
+			fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
 			break;
 		}
 
