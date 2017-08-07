@@ -1,4 +1,4 @@
-CFLAGS+=	-Wall -Wextra -O0 -ggdb
+CFLAGS+=	-Wall -Wextra -O0 -ggdb -lelf
 
 default: all
 

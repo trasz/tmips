@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <libelf.h>
 
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
@@ -593,40 +594,62 @@ beq:
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: tmips base-in-hex binary-path\n");
+	fprintf(stderr, "usage: tmips binary-path\n");
 	exit(1);
 }
 
 int
 main(int argc, char **argv)
 {
-	struct stat sb;
-	unsigned long long base;
-	int *binary;
-	char *endptr;
+	Elf *elf;
+	Elf64_Ehdr *ehdr;
+	Elf64_Phdr *phdr;
+	size_t nsections;
+	int *binary, i;
 	const char *path;
 	int fd, error;
 
-	if (argc != 3)
+	if (argc != 2)
 		usage();
 
-	base = strtoull(argv[1], &endptr, 16);
-	if (*endptr != '\0')
-		errx(1, "malformed hex number \"%s\"", argv[1]);
-
-	path = argv[2];
+	path = argv[1];
 	fd = open(path, O_RDONLY);
 	if (fd < 0)
 		err(1, "%s", path);
 
-	error = fstat(fd, &sb);
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		errx(1, "ELF library too old");
+
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (elf == NULL)
+		errx(1, "elf_begin: %s", elf_errmsg(-1));
+
+	ehdr = elf64_getehdr(elf);
+	if (ehdr == NULL)
+		errx(1, "elf64_getehdr: %s", elf_errmsg(-1));
+
+	printf("entry point at %#lx\n", ehdr->e_entry);
+
+	phdr = elf64_getphdr(elf);
+	if (phdr == NULL)
+		errx(1, "elf64_getphdr: %s", elf_errmsg(-1));
+
+	error = elf_getphdrnum(elf, &nsections);
 	if (error != 0)
-		err(1, "cannot stat %s", path);
+		errx(1, "elf_getphdrnum: %s", elf_errmsg(-1));
 
-	binary = mmap((void *)base, sb.st_size, PROT_READ, MAP_FIXED | MAP_EXCL | MAP_SHARED | MAP_PREFAULT_READ, fd, 0);
-	if (binary == MAP_FAILED)
-		err(1, "cannot map %s at %p", path, (void *)base);
+	for (i = 0; (size_t)i < nsections; i++) {
+		if (phdr[i].p_type != PT_LOAD)
+		       continue;
 
-	return (run(binary));
+		printf("section %d: p_offset %ld, p_vaddr %#lx, p_filesz %ld, p_memsz %ld, p_flags %#x\n",
+		    i, phdr[i].p_offset, phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_memsz, phdr[i].p_flags);
+
+		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, PROT_READ, MAP_FIXED | MAP_EXCL | MAP_SHARED | MAP_PREFAULT_READ, fd, phdr[i].p_offset);
+		if (binary == MAP_FAILED)
+			err(1, "cannot map %s at %p", path, (void *)phdr[i].p_vaddr);
+	}
+
+	return (run((int *)ehdr->e_entry));
 }
 
