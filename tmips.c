@@ -74,22 +74,31 @@ register_name(int i)
 
 #define	FUNCT_SPECIAL_JR	0x08
 #define	FUNCT_SPECIAL_JALR	0x09
-#define	FUNCT_SPECIAL_MOVZ	0x0A
-#define	FUNCT_SPECIAL_MOVN	0x0B
+#define	FUNCT_SPECIAL_MOVZ	0x0a
+#define	FUNCT_SPECIAL_MOVN	0x0b
 
-#define	FUNCT_SPECIAL_SYSCALL	0x0C
-#define	FUNCT_SPECIAL_BREAK	0x0D
-#define	FUNCT_SPECIAL_SYNC	0x0F
+#define	FUNCT_SPECIAL_SYSCALL	0x0c
+#define	FUNCT_SPECIAL_BREAK	0x0d
+#define	FUNCT_SPECIAL_SYNC	0x0f
 
 #define	FUNCT_SPECIAL_MFHI	0x10
 #define	FUNCT_SPECIAL_MTHI	0x11
 #define	FUNCT_SPECIAL_MFLO	0x12
 #define	FUNCT_SPECIAL_MTLO	0x13
 
+#define	FUNCT_SPECIAL_DSLLV	0x14
+#define	FUNCT_SPECIAL_DSRLV	0x16
+#define	FUNCT_SPECIAL_DSRAV	0x17
+
 #define	FUNCT_SPECIAL_MULT	0x18
 #define	FUNCT_SPECIAL_MULTU	0x19
-#define	FUNCT_SPECIAL_DIV	0x1A
-#define	FUNCT_SPECIAL_DIVU	0x1B
+#define	FUNCT_SPECIAL_DIV	0x1a
+#define	FUNCT_SPECIAL_DIVU	0x1b
+
+#define	FUNCT_SPECIAL_DMULT	0x1c
+#define	FUNCT_SPECIAL_DMULTU	0x1d
+#define	FUNCT_SPECIAL_DDIV	0x1e
+#define	FUNCT_SPECIAL_DDIVU	0x1f
 
 #define	FUNCT_SPECIAL_ADD	0x20
 #define	FUNCT_SPECIAL_ADDU	0x21
@@ -103,8 +112,10 @@ register_name(int i)
 
 #define	FUNCT_SPECIAL_SLT	0x2a
 #define	FUNCT_SPECIAL_SLTU	0x2b
+#define	FUNCT_SPECIAL_DADD	0x2c
 #define	FUNCT_SPECIAL_DADDU	0x2d
 
+#define	FUNCT_SPECIAL_DSUB	0x2e
 #define	FUNCT_SPECIAL_DSUBU	0x2f
 
 #define	FUNCT_SPECIAL_TGE	0x30
@@ -116,7 +127,11 @@ register_name(int i)
 
 #define	FUNCT_SPECIAL_TNE	0x36
 #define	FUNCT_SPECIAL_DSLL	0x38
-#define	FUNCT_SPECIAL_DSRA32	0x3F
+#define	FUNCT_SPECIAL_DSRL	0x3a
+#define	FUNCT_SPECIAL_DSRA	0x3b
+#define	FUNCT_SPECIAL_DSLL32	0x3c
+#define	FUNCT_SPECIAL_DSRL32	0x3e
+#define	FUNCT_SPECIAL_DSRA32	0x3f
 
 #define	OPCODE_J	0x02
 #define	OPCODE_JAL	0x03
@@ -128,13 +143,13 @@ register_name(int i)
 
 #define	OPCODE_ADDI	0x08
 #define	OPCODE_ADDIU	0x09
-#define	OPCODE_SLTI	0x0A
-#define	OPCODE_SLTIU	0x0B
+#define	OPCODE_SLTI	0x0a
+#define	OPCODE_SLTIU	0x0b
 
-#define	OPCODE_ANDI	0x0C
-#define	OPCODE_ORI	0x0D
-#define	OPCODE_XORI	0x0E
-#define	OPCODE_LUI	0x0F
+#define	OPCODE_ANDI	0x0c
+#define	OPCODE_ORI	0x0d
+#define	OPCODE_XORI	0x0e
+#define	OPCODE_LUI	0x0f
 
 #define	OPCODE_BEQL	0x14
 #define	OPCODE_BNEL	0x15
@@ -152,10 +167,10 @@ register_name(int i)
 #define	OPCODE_SB	0x28
 #define	OPCODE_SH	0x29
 #define	OPCODE_SWL	0x2a
-#define	OPCODE_SW	0x2B
+#define	OPCODE_SW	0x2b
 
-#define	OPCODE_SWR	0x2E
-#define	OPCODE_CACHE	0x2F
+#define	OPCODE_SWR	0x2e
+#define	OPCODE_CACHE	0x2f
 
 #define	OPCODE_LL	0x30
 #define	OPCODE_LWC1	0x31
@@ -168,11 +183,11 @@ register_name(int i)
 
 #define	OPCODE_SC	0x38
 #define	OPCODE_SWC1	0x39
-#define	OPCODE_SWC2	0x3A
+#define	OPCODE_SWC2	0x3a
 
-#define	OPCODE_SDC1	0x3D
-#define	OPCODE_SDC2	0x3E
-#define	OPCODE_SD	0x3F
+#define	OPCODE_SDC1	0x3d
+#define	OPCODE_SDC2	0x3e
+#define	OPCODE_SD	0x3f
 
 static int
 run(int *pc)
@@ -284,6 +299,24 @@ run(int *pc)
 				TRACE_OPCODE("mtlo");
 				TRACE_RS();
 				break;
+			case FUNCT_SPECIAL_DSLLV:
+				TRACE_OPCODE("dsllv");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_RS();
+				break;
+			case FUNCT_SPECIAL_DSRLV:
+				TRACE_OPCODE("dsrlv");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_RS();
+				break;
+			case FUNCT_SPECIAL_DSRAV:
+				TRACE_OPCODE("dsrav");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_RS();
+				break;
 			case FUNCT_SPECIAL_MULT:
 				TRACE_OPCODE("mult");
 				TRACE_RS();
@@ -301,6 +334,26 @@ run(int *pc)
 				break;
 			case FUNCT_SPECIAL_DIVU:
 				TRACE_OPCODE("divu");
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DMULT:
+				TRACE_OPCODE("dmult");
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DMULTU:
+				TRACE_OPCODE("dmultu");
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DDIV:
+				TRACE_OPCODE("ddiv");
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DDIVU:
+				TRACE_OPCODE("ddivu");
 				TRACE_RS();
 				TRACE_RT();
 				break;
@@ -364,8 +417,20 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+			case FUNCT_SPECIAL_DADD:
+				TRACE_OPCODE("dadd");
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				break;
 			case FUNCT_SPECIAL_DADDU:
 				TRACE_OPCODE("daddu");
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSUB:
+				TRACE_OPCODE("dsub");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
@@ -410,6 +475,28 @@ run(int *pc)
 				TRACE_OPCODE("dsll");
 				TRACE_RD();
 				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSRL:
+				TRACE_OPCODE("dsrl");
+				TRACE_RD();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSRA:
+				TRACE_OPCODE("dsra");
+				TRACE_RD();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSLL32:
+				TRACE_OPCODE("dsll32");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_IMM();
+				break;
+			case FUNCT_SPECIAL_DSRL32:
+				TRACE_OPCODE("dsrl32");
+				TRACE_RD();
+				TRACE_RT();
+				TRACE_IMM();
 				break;
 			case FUNCT_SPECIAL_DSRA32:
 				TRACE_OPCODE("dsra32");
