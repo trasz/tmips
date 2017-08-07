@@ -11,8 +11,8 @@
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
 #define	TRACE_OPCODE(STR)	do {								\
-		fprintf(stdout, "\n%8llx:\t%08x\t%-7s ",					\
-		    (unsigned long long)pc, ntohl(instruction), STR);			\
+		fprintf(stdout, "\n%12llx:\t%08x\t%-7s ",					\
+		    (unsigned long long)pc, instruction, STR);					\
 	} while (0)
 
 #define	TRACE_REG(REG)	do {									\
@@ -103,6 +103,9 @@ register_name(int i)
 
 #define	FUNCT_SPECIAL_SLT	0x2a
 #define	FUNCT_SPECIAL_SLTU	0x2b
+#define	FUNCT_SPECIAL_DADDU	0x2d
+
+#define	FUNCT_SPECIAL_DSUBU	0x2f
 
 #define	FUNCT_SPECIAL_TGE	0x30
 #define	FUNCT_SPECIAL_TGEU	0x31
@@ -112,6 +115,7 @@ register_name(int i)
 #define	FUNCT_SPECIAL_TEQ	0x34
 
 #define	FUNCT_SPECIAL_TNE	0x36
+#define	FUNCT_SPECIAL_DSLL	0x38
 #define	FUNCT_SPECIAL_DSRA32	0x3F
 
 #define	OPCODE_J	0x02
@@ -133,6 +137,8 @@ register_name(int i)
 #define	OPCODE_LUI	0x0F
 
 #define	OPCODE_BEQL	0x14
+#define	OPCODE_BNEL	0x15
+#define	OPCODE_DADDIU	0x19
 
 #define	OPCODE_LB	0x20
 #define	OPCODE_LH	0x21
@@ -158,6 +164,7 @@ register_name(int i)
 
 #define	OPCODE_LDC1	0x35
 #define	OPCODE_LDC2	0x36
+#define	OPCODE_LD	0x37
 
 #define	OPCODE_SC	0x38
 #define	OPCODE_SWC1	0x39
@@ -165,12 +172,13 @@ register_name(int i)
 
 #define	OPCODE_SDC1	0x3D
 #define	OPCODE_SDC2	0x3E
+#define	OPCODE_SD	0x3F
 
 static int
 run(int *pc)
 {
 	// CPU context.
-	uint32_t reg[32];
+	uint64_t reg[32];
 
 	// Temporaries.
 	uint32_t rs, rt, rd, instruction, jump, opcode, funct;
@@ -178,7 +186,7 @@ run(int *pc)
 	int16_t immediate;
 
 	for (;;) {
-		instruction = *pc;
+		instruction = ntohl(*pc);
 
 		opcode = (instruction & (0x3F << 26)) >> 26;
 
@@ -356,6 +364,18 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+			case FUNCT_SPECIAL_DADDU:
+				TRACE_OPCODE("daddu");
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				break;
+			case FUNCT_SPECIAL_DSUBU:
+				TRACE_OPCODE("dsubu");
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				break;
 			case FUNCT_SPECIAL_TGE:
 				TRACE_OPCODE("tge");
 				TRACE_RS();
@@ -386,6 +406,11 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+			case FUNCT_SPECIAL_DSLL:
+				TRACE_OPCODE("dsll");
+				TRACE_RD();
+				TRACE_RT();
+				break;
 			case FUNCT_SPECIAL_DSRA32:
 				TRACE_OPCODE("dsra32");
 				TRACE_RD();
@@ -394,7 +419,7 @@ run(int *pc)
 				break;
 			default:
 				TRACE_OPCODE("SPECIAL");
-				fprintf(stdout, "(unknown opcode %x, function %x)", opcode, funct);
+				fprintf(stdout, "(opcode %#x, function %#x)", opcode, funct);
 				break;
 			}
 			break;
@@ -442,7 +467,7 @@ beq:
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			reg[rt] = reg[rs] + immediate;
+			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
 			break;
 		case OPCODE_SLTI:
 			TRACE_OPCODE("slti");
@@ -483,6 +508,19 @@ beq:
 		case OPCODE_BEQL:
 			TRACE_OPCODE("beql");
 			goto beq;
+		case OPCODE_BNEL:
+			TRACE_OPCODE("bnel");
+			TRACE_RS();
+			TRACE_RT();
+			TRACE_IMM();
+			break;
+		case OPCODE_DADDIU:
+			TRACE_OPCODE("daddiu");
+			TRACE_RS();
+			TRACE_RT();
+			TRACE_IMM();
+			reg[rt] = reg[rs] + immediate;
+			break;
 		case OPCODE_LB:
 			TRACE_OPCODE("lb");
 			TRACE_RT();
@@ -560,6 +598,11 @@ beq:
 		case OPCODE_LDC2:
 			TRACE_OPCODE("ldc2");
 			break;
+		case OPCODE_LD:
+			TRACE_OPCODE("ld");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			break;
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
 			TRACE_RT();
@@ -579,9 +622,14 @@ beq:
 		case OPCODE_SDC2:
 			TRACE_OPCODE("sdc2");
 			break;
+		case OPCODE_SD:
+			TRACE_OPCODE("sd");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			break;
 		default:
 			TRACE_OPCODE("UNKNOWN");
-			//fprintf(stderr, "unknown opcode %x, instruction %llx\n", opcode, instruction);
+			fprintf(stdout, "(opcode %#x, function %#x)", opcode, funct);
 			break;
 		}
 
