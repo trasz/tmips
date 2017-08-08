@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include <sys/endian.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <err.h>
@@ -33,15 +33,14 @@
 
 #define	TRACE_RESULT_REG(REG)	do {								\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "\t# %s := %ld (%#lx)", register_name(REG), reg[REG], reg[REG]);	\
+			fprintf(stderr, "   \t# %s := %ld (%#lx)", register_name(REG), reg[REG], reg[REG]);	\
 		else										\
-			fprintf(stderr, "\t# $%d := %ld (%#lx)", REG, reg[REG], reg[REG]);		\
+			fprintf(stderr, "   \t# $%d := %ld (%#lx)", REG, reg[REG], reg[REG]);	\
 	} while (0)
 
 #define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
 #define	TRACE_RESULT_RS()	TRACE_RESULT_REG(rs)
 #define	TRACE_RESULT_RT()	TRACE_RESULT_REG(rt)
-
 
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (register_name(REG) != NULL)							\
@@ -54,6 +53,10 @@
 
 #define	TRACE_IMM()	do {									\
 		fprintf(stderr, "%d", immediate);						\
+	} while (0)
+
+#define	TRACE_SA()	do {									\
+		fprintf(stderr, "%d", sa);							\
 	} while (0)
 
 #define	TRACE_JUMP()	do {									\
@@ -235,23 +238,29 @@ run(int *pc)
 	int64_t reg[32];
 
 	// Temporaries.
-	uint32_t rs, rt, rd, instruction, jump, opcode, funct;
+	uint32_t rs, rt, rd, sa, instruction, jump, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
+	int *next_pc;
 
 	memset(reg, 0, sizeof(reg));
 	reg[0] = 0;
+	reg[4] = initial_stack_pointer();
 	reg[25] = (int64_t)pc;
-	reg[29] = initial_stack_pointer();
+	reg[29] = reg[4];
+
+	next_pc = pc;
 
 	for (;;) {
-		instruction = ntohl(*pc);
+		instruction = be32toh(*pc);
+		next_pc++;
 
 		opcode = (instruction & (0x3F << 26)) >> 26;
 
 		rs = (instruction & (0x1F << 21)) >> 21;
 		rt = (instruction & (0x1F << 16)) >> 16;
 		rd = (instruction & (0x1F << 11)) >> 11;
+		sa = (instruction & (0x1F << 6)) >> 6;
 
 		immediate = (instruction << 16) >> 16;
 
@@ -266,6 +275,9 @@ run(int *pc)
 				TRACE_OPCODE("sll");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = (int32_t)reg[rt] << sa;
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SRL:
 				TRACE_OPCODE("srl");
@@ -297,6 +309,7 @@ run(int *pc)
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
 				TRACE_RS();
+				next_pc = (int *)reg[rs];
 				break;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
@@ -517,6 +530,9 @@ run(int *pc)
 				TRACE_OPCODE("dsll");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = reg[rt] << sa;
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRL:
 				TRACE_OPCODE("dsrl");
@@ -566,9 +582,11 @@ beq:
 			TRACE_RS();
 			TRACE_RT();
 			TRACE_JUMP();
-			if (reg[rs] != reg[rt])
-				break;
-			//pc += jump << 2;
+			if (reg[rs] == reg[rt])
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = pc + jump;
+			else
+				next_pc = pc + 2;
 			break;
 		case OPCODE_BNE:
 			TRACE_OPCODE("bne");
@@ -579,6 +597,11 @@ beq:
 			TRACE_OPCODE("blez");
 			TRACE_RS();
 			TRACE_IMM();
+#if 0
+			if (reg[rs] <= 0)
+				next_pc = next_pc + jump;
+			// XXX: delay slot?
+#endif
 			break;
 		case OPCODE_BGTZ:
 			TRACE_OPCODE("bgtz");
@@ -649,8 +672,8 @@ beq:
 			break;
 		case OPCODE_DADDIU:
 			TRACE_OPCODE("daddiu");
-			TRACE_RS();
 			TRACE_RT();
+			TRACE_RS();
 			TRACE_IMM();
 			reg[rt] = reg[rs] + immediate;
 			TRACE_RESULT_RT();
@@ -669,7 +692,9 @@ beq:
 		case OPCODE_LW:
 			TRACE_OPCODE("lw");
 			TRACE_RT();
-			TRACE_IMM();
+			TRACE_IMM_RS();
+			reg[rt] = be32toh(*(int32_t *)(((char *)reg[rs] + immediate)));
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LBU:
 			TRACE_OPCODE("lbu");
@@ -736,7 +761,7 @@ beq:
 			TRACE_OPCODE("ld");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *((char *)reg[rs] + immediate);
+			reg[rt] = be64toh(*(int64_t *)(((char *)reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SC:
@@ -762,7 +787,7 @@ beq:
 			TRACE_OPCODE("sd");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int64_t *)((char *)(reg[rs]) + immediate)) = reg[rt];
+			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
 			break;
 		default:
 			TRACE_OPCODE("UNKNOWN");
@@ -770,7 +795,7 @@ beq:
 			break;
 		}
 
-		pc++;
+		pc = next_pc;
 	}
 
 	return (0);
@@ -789,10 +814,10 @@ main(int argc, char **argv)
 	Elf *elf;
 	Elf64_Ehdr *ehdr;
 	Elf64_Phdr *phdr;
-	size_t nsections;
-	int *binary, i;
 	const char *path;
-	int fd, error;
+	int *binary;
+	size_t nsections;
+	int fd, error, i, prot;
 
 	if (argc != 2)
 		usage();
@@ -830,7 +855,11 @@ main(int argc, char **argv)
 		printf("section %d: p_offset %ld, p_vaddr %#lx, p_filesz %ld, p_memsz %ld, p_flags %#x\n",
 		    i, phdr[i].p_offset, phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_memsz, phdr[i].p_flags);
 
-		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, PROT_READ, MAP_FIXED | MAP_EXCL | MAP_SHARED | MAP_PREFAULT_READ, fd, phdr[i].p_offset);
+		prot = PROT_READ;
+		if (phdr[i].p_flags & PF_W)
+			prot |= PROT_WRITE;
+
+		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, prot, MAP_FIXED | MAP_EXCL | MAP_PRIVATE | MAP_PREFAULT_READ, fd, phdr[i].p_offset);
 		if (binary == MAP_FAILED)
 			err(1, "cannot map %s at %p", path, (void *)phdr[i].p_vaddr);
 	}
