@@ -33,9 +33,9 @@
 
 #define	TRACE_RESULT_REG(REG)	do {								\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "   \t# %s := %ld (%#lx)", register_name(REG), reg[REG], reg[REG]);	\
+			fprintf(stderr, "   \t# %s := %#018lx (%ld)", register_name(REG), reg[REG], reg[REG]);	\
 		else										\
-			fprintf(stderr, "   \t# $%d := %ld (%#lx)", REG, reg[REG], reg[REG]);	\
+			fprintf(stderr, "   \t# $%d := %#018lx (%ld)", REG, reg[REG], reg[REG]);\
 	} while (0)
 
 #define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
@@ -63,8 +63,10 @@
 		fprintf(stderr, "%x", jump);							\
 	} while (0)
 
+#define	TRACE_STR(STR)	fprintf(stderr, "   \t# %s", STR)
+
 static const char *register_names[32] = {
-	"zero", "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
+	"$0",   "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
 	"a4",   "a5",   "a6",   "a7",   "t0",   "t1",   "t2",   "t3",
 	"s0",   "s1",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
 	"t8",   "t9",   "k0",   "k1",   "gp",   "sp",   "s8",   "ra"
@@ -249,11 +251,11 @@ run(int *pc)
 	reg[25] = (int64_t)pc;
 	reg[29] = reg[4];
 
-	next_pc = pc;
+	next_pc = pc + 1;
 
 	for (;;) {
+		//fprintf(stderr, "\npc %p, next %p", pc, next_pc);
 		instruction = be32toh(*pc);
-		next_pc++;
 
 		opcode = (instruction & (0x3F << 26)) >> 26;
 
@@ -309,8 +311,9 @@ run(int *pc)
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
 				TRACE_RS();
+				pc++;
 				next_pc = (int *)reg[rs];
-				break;
+				continue;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
 				break;
@@ -578,30 +581,44 @@ run(int *pc)
 			break;
 		case OPCODE_BEQ:
 			TRACE_OPCODE("beq");
-beq:
 			TRACE_RS();
 			TRACE_RT();
 			TRACE_JUMP();
-			if (reg[rs] == reg[rt])
+			if (reg[rs] == reg[rt]) {
+				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = pc + jump;
-			else
-				next_pc = pc + 2;
+				next_pc = next_pc + jump;
+				TRACE_STR("taken");
+				continue;
+			}
+			TRACE_STR("not taken");
 			break;
 		case OPCODE_BNE:
 			TRACE_OPCODE("bne");
 			TRACE_RS();
 			TRACE_RT();
+			TRACE_JUMP();
+			if (reg[rs] != reg[rt]) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + jump;
+				TRACE_STR("taken");
+				continue;
+			}
+			TRACE_STR("not taken");
 			break;
 		case OPCODE_BLEZ:
 			TRACE_OPCODE("blez");
 			TRACE_RS();
-			TRACE_IMM();
-#if 0
-			if (reg[rs] <= 0)
+			TRACE_JUMP();
+			if (reg[rs] <= 0) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
 				next_pc = next_pc + jump;
-			// XXX: delay slot?
-#endif
+				TRACE_STR("taken");
+				continue;
+			}
+			TRACE_STR("not taken");
 			break;
 		case OPCODE_BGTZ:
 			TRACE_OPCODE("bgtz");
@@ -663,7 +680,21 @@ beq:
 			break;
 		case OPCODE_BEQL:
 			TRACE_OPCODE("beql");
-			goto beq;
+			TRACE_RS();
+			TRACE_RT();
+			TRACE_JUMP();
+			if (reg[rs] == reg[rt]) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + jump;
+				TRACE_STR("taken");
+			} else {
+				// Skip the delay slot.
+				pc += 2;
+				next_pc = pc + 1;
+				TRACE_STR("not taken; delay slot skipped");
+			}
+			continue;
 		case OPCODE_BNEL:
 			TRACE_OPCODE("bnel");
 			TRACE_RS();
@@ -796,6 +827,7 @@ beq:
 		}
 
 		pc = next_pc;
+		next_pc++;
 	}
 
 	return (0);
