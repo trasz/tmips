@@ -316,7 +316,13 @@ run(int *pc)
 				continue;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
-				break;
+				TRACE_RD();
+				TRACE_RS();
+				reg[rd] = (int64_t)(next_pc + 1);
+				TRACE_RESULT_RD();
+				pc++;
+				next_pc = (int *)reg[rs];
+				continue;
 			case FUNCT_SPECIAL_MOVZ:
 				TRACE_OPCODE("movz");
 				TRACE_RD();
@@ -583,11 +589,11 @@ run(int *pc)
 			TRACE_OPCODE("beq");
 			TRACE_RS();
 			TRACE_RT();
-			TRACE_JUMP();
+			TRACE_IMM();
 			if (reg[rs] == reg[rt]) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + jump;
+				next_pc = next_pc + immediate;
 				TRACE_STR("taken");
 				continue;
 			}
@@ -597,11 +603,11 @@ run(int *pc)
 			TRACE_OPCODE("bne");
 			TRACE_RS();
 			TRACE_RT();
-			TRACE_JUMP();
+			TRACE_IMM();
 			if (reg[rs] != reg[rt]) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + jump;
+				next_pc = next_pc + immediate;
 				TRACE_STR("taken");
 				continue;
 			}
@@ -610,11 +616,11 @@ run(int *pc)
 		case OPCODE_BLEZ:
 			TRACE_OPCODE("blez");
 			TRACE_RS();
-			TRACE_JUMP();
+			TRACE_IMM();
 			if (reg[rs] <= 0) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + jump;
+				next_pc = next_pc + immediate;
 				TRACE_STR("taken");
 				continue;
 			}
@@ -682,11 +688,11 @@ run(int *pc)
 			TRACE_OPCODE("beql");
 			TRACE_RS();
 			TRACE_RT();
-			TRACE_JUMP();
+			TRACE_IMM();
 			if (reg[rs] == reg[rt]) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + jump;
+				next_pc = next_pc + immediate;
 				TRACE_STR("taken");
 			} else {
 				// Skip the delay slot.
