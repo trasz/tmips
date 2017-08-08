@@ -13,6 +13,7 @@
 
 #define	STACK_PAGES	3
 #define	TRACE
+#define	DIE_ON_UNKNOWN
 
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
@@ -168,6 +169,10 @@ register_name(int i)
 #define	FUNCT_SPECIAL_DSRL32	0x3e
 #define	FUNCT_SPECIAL_DSRA32	0x3f
 
+#define	OPCODE_REGIMM	0x01
+
+#define	FUNCT_REGIMM_BAL	0x11
+
 #define	OPCODE_J	0x02
 #define	OPCODE_JAL	0x03
 
@@ -283,6 +288,7 @@ run(int *pc)
 				reg[rd] = (int32_t)reg[rt] << sa;
 				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_SRL:
 				TRACE_OPCODE("srl");
 				TRACE_RD();
@@ -310,6 +316,7 @@ run(int *pc)
 				TRACE_RT();
 				TRACE_RS();
 				break;
+#endif
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
 				TRACE_RS();
@@ -325,6 +332,7 @@ run(int *pc)
 				pc++;
 				next_pc = (int *)reg[rs];
 				continue;
+#if 0
 			case FUNCT_SPECIAL_MOVZ:
 				TRACE_OPCODE("movz");
 				TRACE_RD();
@@ -420,6 +428,7 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_ADD:
 				TRACE_OPCODE("add");
 				TRACE_RD();
@@ -434,6 +443,7 @@ run(int *pc)
 				TRACE_RT();
 				reg[rd] = reg[rs] + reg[rt];
 				break;
+#if 0
 			case FUNCT_SPECIAL_SUB:
 				TRACE_OPCODE("sub");
 				TRACE_RD();
@@ -446,6 +456,7 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_AND:
 				TRACE_OPCODE("and");
 				TRACE_RD();
@@ -454,6 +465,7 @@ run(int *pc)
 				reg[rd] = reg[rs] & reg[rt];
 				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_OR:
 				TRACE_OPCODE("or");
 				TRACE_RD();
@@ -481,11 +493,14 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_DADD:
 				TRACE_OPCODE("dadd");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = reg[rs] + reg[rt];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DADDU:
 				TRACE_OPCODE("daddu");
@@ -500,13 +515,18 @@ run(int *pc)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = reg[rs] - reg[rt];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSUBU:
 				TRACE_OPCODE("dsubu");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = reg[rs] - reg[rt];
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_TGE:
 				TRACE_OPCODE("tge");
 				TRACE_RS();
@@ -537,6 +557,7 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_DSLL:
 				TRACE_OPCODE("dsll");
 				TRACE_RD();
@@ -545,16 +566,22 @@ run(int *pc)
 				reg[rd] = reg[rt] << sa;
 				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_DSRL:
 				TRACE_OPCODE("dsrl");
 				TRACE_RD();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_DSRA:
 				TRACE_OPCODE("dsra");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = reg[rt] >> sa;
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_DSLL32:
 				TRACE_OPCODE("dsll32");
 				TRACE_RD();
@@ -567,18 +594,53 @@ run(int *pc)
 				TRACE_RT();
 				TRACE_IMM();
 				break;
+#endif
 			case FUNCT_SPECIAL_DSRA32:
 				TRACE_OPCODE("dsra32");
 				TRACE_RD();
 				TRACE_RT();
-				TRACE_IMM();
+				TRACE_SA();
+				reg[rd] = reg[rt] >> (32 + sa);
+				TRACE_RESULT_RD();
 				break;
 			default:
+#ifdef DIE_ON_UNKNOWN
+				fprintf(stderr, "\n");
+				errx(1, "unknown special opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+#else
 				TRACE_OPCODE("SPECIAL");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
+#endif
 				break;
 			}
 			break;
+
+		case OPCODE_REGIMM:
+			funct = (instruction & (0x1F << 16)) >> 16;
+
+			switch (funct) {
+			case FUNCT_REGIMM_BAL:
+				TRACE_OPCODE("bal");
+				TRACE_IMM();
+				reg[31] = (int64_t)(next_pc + 1);
+				TRACE_RESULT_REG(31);
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + immediate;
+				break;
+			default:
+#ifdef DIE_ON_UNKNOWN
+				fprintf(stderr, "\n");
+				errx(1, "unknown regimm opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+#else
+				TRACE_OPCODE("REGIMM");
+				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
+#endif
+				break;
+			}
+			break;
+
+#if 0
 		case OPCODE_J:
 			TRACE_OPCODE("j");
 			TRACE_JUMP();
@@ -587,6 +649,7 @@ run(int *pc)
 			TRACE_OPCODE("jal");
 			TRACE_RS();
 			break;
+#endif
 		case OPCODE_BEQ:
 			TRACE_OPCODE("beq");
 			TRACE_RS();
@@ -628,10 +691,12 @@ run(int *pc)
 			}
 			TRACE_STR("not taken");
 			break;
+#if 0
 		case OPCODE_BGTZ:
 			TRACE_OPCODE("bgtz");
 			TRACE_RS();
 			break;
+#endif
 		case OPCODE_ADDI:
 			TRACE_OPCODE("addi");
 			TRACE_RT();
@@ -647,17 +712,24 @@ run(int *pc)
 			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
 			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_SLTI:
 			TRACE_OPCODE("slti");
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
 			break;
+#endif
 		case OPCODE_SLTIU:
 			TRACE_OPCODE("sltiu");
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
+			if (reg[rs] < immediate)
+				reg[rt] = 1;
+			else
+				reg[rt] = 0;
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_ANDI:
 			TRACE_OPCODE("andi");
@@ -668,6 +740,7 @@ run(int *pc)
 			uimmediate = (immediate << 16) >> 16;
 			reg[rt] = reg[rs] & uimmediate;
 			break;
+#if 0
 		case OPCODE_ORI:
 			TRACE_OPCODE("ori");
 			TRACE_RD();
@@ -679,6 +752,7 @@ run(int *pc)
 			TRACE_RS();
 			TRACE_RT();
 			break;
+#endif
 		case OPCODE_LUI:
 			TRACE_OPCODE("lui");
 			TRACE_RT();
@@ -708,7 +782,18 @@ run(int *pc)
 			TRACE_RS();
 			TRACE_RT();
 			TRACE_IMM();
-			break;
+			if (reg[rs] != reg[rt]) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + immediate;
+				TRACE_STR("taken");
+			} else {
+				// Skip the delay slot.
+				pc += 2;
+				next_pc = pc + 1;
+				TRACE_STR("not taken; delay slot skipped");
+			}
+			continue;
 		case OPCODE_DADDIU:
 			TRACE_OPCODE("daddiu");
 			TRACE_RT();
@@ -720,7 +805,11 @@ run(int *pc)
 		case OPCODE_LB:
 			TRACE_OPCODE("lb");
 			TRACE_RT();
+			TRACE_IMM_RS();
+			reg[rt] = *(int8_t *)(((char *)reg[rs] + immediate));
+			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_LH:
 			TRACE_OPCODE("lh");
 			break;
@@ -728,6 +817,7 @@ run(int *pc)
 			TRACE_OPCODE("lwl");
 			TRACE_RT();
 			break;
+#endif
 		case OPCODE_LW:
 			TRACE_OPCODE("lw");
 			TRACE_RT();
@@ -739,7 +829,10 @@ run(int *pc)
 			TRACE_OPCODE("lbu");
 			TRACE_RT();
 			TRACE_IMM_RS();
+			reg[rt] = *(uint8_t *)(((char *)reg[rs] + immediate));
+			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
 			TRACE_RT();
@@ -749,11 +842,14 @@ run(int *pc)
 			TRACE_OPCODE("lwr");
 			TRACE_RT();
 			break;
+#endif
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
 			TRACE_RT();
-			TRACE_IMM();
+			TRACE_IMM_RS();
+			*((int8_t *)((char *)(reg[rs]) + immediate)) = reg[rt];
 			break;
+#if 0
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
 			TRACE_RT();
@@ -762,11 +858,14 @@ run(int *pc)
 			TRACE_OPCODE("swl");
 			TRACE_RT();
 			break;
+#endif
 		case OPCODE_SW:
 			TRACE_OPCODE("sw");
 			TRACE_RT();
-			TRACE_IMM();
+			TRACE_IMM_RS();
+			*((int32_t *)((char *)(reg[rs]) + immediate)) = htobe32(reg[rt]);
 			break;
+#if 0
 		case OPCODE_SWR:
 			TRACE_OPCODE("swr");
 			TRACE_RT();
@@ -796,6 +895,7 @@ run(int *pc)
 		case OPCODE_LDC2:
 			TRACE_OPCODE("ldc2");
 			break;
+#endif
 		case OPCODE_LD:
 			TRACE_OPCODE("ld");
 			TRACE_RT();
@@ -803,6 +903,7 @@ run(int *pc)
 			reg[rt] = be64toh(*(int64_t *)(((char *)reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
 			TRACE_RT();
@@ -822,6 +923,7 @@ run(int *pc)
 		case OPCODE_SDC2:
 			TRACE_OPCODE("sdc2");
 			break;
+#endif
 		case OPCODE_SD:
 			TRACE_OPCODE("sd");
 			TRACE_RT();
@@ -829,9 +931,13 @@ run(int *pc)
 			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
 			break;
 		default:
+#ifdef DIE_ON_UNKNOWN
+			fprintf(stderr, "\n");
+			errx(1, "unknown opcode %#x at address %p", opcode, (void *)pc);
+#else
 			TRACE_OPCODE("UNKNOWN");
 			fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
-			break;
+#endif
 		}
 
 		pc = next_pc;
