@@ -206,6 +206,7 @@ register_name(int i)
 #define	OPCODE_LBU	0x24
 #define	OPCODE_LHU	0x25
 #define	OPCODE_LWR	0x26
+#define	OPCODE_LWU	0x27
 
 #define	OPCODE_SB	0x28
 #define	OPCODE_SH	0x29
@@ -247,7 +248,7 @@ static int
 run(int *pc)
 {
 	// CPU context.
-	int64_t reg[32];
+	int64_t reg[32], hi, lo;
 
 	// Temporaries.
 	uint32_t rs, rt, rd, sa, instruction, jump, opcode, funct;
@@ -386,10 +387,14 @@ run(int *pc)
 				TRACE_OPCODE("mthi");
 				TRACE_RS();
 				break;
+#endif
 			case FUNCT_SPECIAL_MFLO:
 				TRACE_OPCODE("mflo");
 				TRACE_RD();
+				reg[rd] = lo;
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_MTLO:
 				TRACE_OPCODE("mtlo");
 				TRACE_RS();
@@ -438,11 +443,15 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_DMULT:
 				TRACE_OPCODE("dmult");
 				TRACE_RS();
 				TRACE_RT();
+				lo = reg[rs] * reg[rt];
+				hi = 0; // XXX
 				break;
+#if 0
 			case FUNCT_SPECIAL_DMULTU:
 				TRACE_OPCODE("dmultu");
 				TRACE_RS();
@@ -453,12 +462,14 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_DDIVU:
 				TRACE_OPCODE("ddivu");
 				TRACE_RS();
 				TRACE_RT();
+				lo = (uint64_t)reg[rs] / (uint64_t)reg[rt];
+				hi = (uint64_t)reg[rs] % (uint64_t)reg[rt];
 				break;
-#endif
 			case FUNCT_SPECIAL_ADD:
 				TRACE_OPCODE("add");
 				TRACE_RD();
@@ -591,11 +602,14 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_TEQ:
 				TRACE_OPCODE("teq");
 				TRACE_RS();
 				TRACE_RT();
+				TRACE_STR("dummy");
 				break;
+#if 0
 			case FUNCT_SPECIAL_TNE:
 				TRACE_OPCODE("tne");
 				TRACE_RS();
@@ -903,6 +917,13 @@ run(int *pc)
 			TRACE_RT();
 			break;
 #endif
+		case OPCODE_LWU:
+			TRACE_OPCODE("lwu");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			reg[rt] = *(uint16_t *)(((char *)reg[rs] + immediate));
+			TRACE_RESULT_RT();
+			break;
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
 			TRACE_RT();
