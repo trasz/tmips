@@ -1,3 +1,4 @@
+#include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -8,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libelf.h>
+#include <unistd.h>
 
 #define	STACK_PAGES	3
 #define	TRACE
@@ -855,7 +857,8 @@ main(int argc, char **argv)
 	const char *path;
 	int *binary;
 	size_t nsections;
-	int fd, error, i, prot;
+	ssize_t nread;
+	int fd, error, i;
 
 	if (argc != 2)
 		usage();
@@ -893,13 +896,18 @@ main(int argc, char **argv)
 		printf("section %d: p_offset %ld, p_vaddr %#lx, p_filesz %ld, p_memsz %ld, p_flags %#x\n",
 		    i, phdr[i].p_offset, phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_memsz, phdr[i].p_flags);
 
-		prot = PROT_READ;
-		if (phdr[i].p_flags & PF_W)
-			prot |= PROT_WRITE;
-
-		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, prot, MAP_FIXED | MAP_EXCL | MAP_PRIVATE | MAP_PREFAULT_READ, fd, phdr[i].p_offset);
+		/*
+		 * The fact that p_memsz is often different from p_filesz
+		 * makes mmap(2) rather non-trivial.
+		 */
+		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, PROT_READ | PROT_WRITE,
+		    MAP_ANON | MAP_FIXED | MAP_EXCL | MAP_PRIVATE, -1, 0);
 		if (binary == MAP_FAILED)
 			err(1, "cannot map %s at %p", path, (void *)phdr[i].p_vaddr);
+
+		nread = pread(fd, binary, phdr[i].p_filesz, phdr[i].p_offset);
+		if (nread != (ssize_t)phdr[i].p_filesz)
+			err(1, "read");
 	}
 
 	return (run((int *)ehdr->e_entry));
