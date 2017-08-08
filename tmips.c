@@ -173,6 +173,7 @@ register_name(int i)
 
 #define	OPCODE_REGIMM	0x01
 
+#define	FUNCT_REGIMM_BLTZ	0x00
 #define	FUNCT_REGIMM_BAL	0x11
 
 #define	OPCODE_J	0x02
@@ -274,6 +275,7 @@ run(int *pc)
 		sa = (instruction & (0x1F << 6)) >> 6;
 
 		immediate = (instruction << 16) >> 16;
+		uimmediate = (immediate << 16) >> 16;
 
 		jump = instruction & 0x3FFFFFF;
 
@@ -290,28 +292,38 @@ run(int *pc)
 				reg[rd] = (int32_t)reg[rt] << sa;
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_SRL:
 				TRACE_OPCODE("srl");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = (uint32_t)reg[rt] >> sa;
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SRA:
 				TRACE_OPCODE("sra");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = reg[rt] >> sa;
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_SLLV:
 				TRACE_OPCODE("sllv");
 				TRACE_RD();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_SRLV:
 				TRACE_OPCODE("srlv");
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
+				reg[rd] = reg[rt] > reg[rs];
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_SRAV:
 				TRACE_OPCODE("srav");
 				TRACE_RD();
@@ -361,9 +373,11 @@ run(int *pc)
 			case FUNCT_SPECIAL_BREAK:
 				TRACE_OPCODE("break");
 				break;
+#endif
 			case FUNCT_SPECIAL_SYNC:
 				TRACE_OPCODE("sync");
 				break;
+#if 0
 			case FUNCT_SPECIAL_MFHI:
 				TRACE_OPCODE("mfhi");
 				TRACE_RD();
@@ -380,18 +394,24 @@ run(int *pc)
 				TRACE_OPCODE("mtlo");
 				TRACE_RS();
 				break;
+#endif
 			case FUNCT_SPECIAL_DSLLV:
 				TRACE_OPCODE("dsllv");
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
+				reg[rd] = reg[rt] << reg[rs];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRLV:
 				TRACE_OPCODE("dsrlv");
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
+				reg[rd] = (uint64_t)reg[rt] >> reg[rs];
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_DSRAV:
 				TRACE_OPCODE("dsrav");
 				TRACE_RD();
@@ -452,6 +472,7 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				reg[rd] = reg[rs] + reg[rt];
+				TRACE_RESULT_RD();
 				break;
 #if 0
 			case FUNCT_SPECIAL_SUB:
@@ -460,13 +481,15 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_SUBU:
 				TRACE_OPCODE("subu");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = (uint32_t)reg[rs] - (uint32_t)reg[rt];
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_AND:
 				TRACE_OPCODE("and");
 				TRACE_RD();
@@ -475,35 +498,46 @@ run(int *pc)
 				reg[rd] = reg[rs] & reg[rt];
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_OR:
 				TRACE_OPCODE("or");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = reg[rs] | reg[rt];
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_XOR:
 				TRACE_OPCODE("xor");
 				break;
+#endif
 			case FUNCT_SPECIAL_NOR:
 				TRACE_OPCODE("nor");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				reg[rd] = ~(reg[rs] | reg[rt]);
+				TRACE_RESULT_RD();
 				break;
+#if 0
 			case FUNCT_SPECIAL_SLT:
 				TRACE_OPCODE("slt");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_SLTU:
 				TRACE_OPCODE("sltu");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				if ((uint64_t)reg[rs] < (uint64_t)reg[rt])
+					reg[rd] = 1;
+				else
+					reg[rd] = 0;
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_DADD:
 				TRACE_OPCODE("dadd");
 				TRACE_RD();
@@ -576,13 +610,14 @@ run(int *pc)
 				reg[rd] = reg[rt] << sa;
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_DSRL:
 				TRACE_OPCODE("dsrl");
 				TRACE_RD();
 				TRACE_RT();
+				TRACE_SA();
+				reg[rd] = (uint64_t)reg[rt] >> sa;
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_DSRA:
 				TRACE_OPCODE("dsra");
 				TRACE_RD();
@@ -591,20 +626,22 @@ run(int *pc)
 				reg[rd] = reg[rt] >> sa;
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_DSLL32:
 				TRACE_OPCODE("dsll32");
 				TRACE_RD();
 				TRACE_RT();
-				TRACE_IMM();
+				TRACE_SA();
+				reg[rd] = reg[rt] << (sa + 32);
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRL32:
 				TRACE_OPCODE("dsrl32");
 				TRACE_RD();
 				TRACE_RT();
-				TRACE_IMM();
+				TRACE_SA();
+				reg[rd] = reg[rt] >> (sa + 32);
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_DSRA32:
 				TRACE_OPCODE("dsra32");
 				TRACE_RD();
@@ -629,6 +666,17 @@ run(int *pc)
 			funct = (instruction & (0x1F << 16)) >> 16;
 
 			switch (funct) {
+			case FUNCT_REGIMM_BLTZ:
+				TRACE_OPCODE("bltz");
+				TRACE_RS();
+				TRACE_IMM();
+				if (reg[rs] < 0) {
+					pc++;
+					// We're not shifting left by two, because pc is already an (int *).
+					next_pc = next_pc + immediate;
+					continue;
+				}
+				break;
 			case FUNCT_REGIMM_BAL:
 				TRACE_OPCODE("bal");
 				TRACE_IMM();
@@ -746,23 +794,25 @@ run(int *pc)
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			uimmediate = immediate;
-			uimmediate = (immediate << 16) >> 16;
 			reg[rt] = reg[rs] & uimmediate;
+			TRACE_RESULT_RT();
 			break;
-#if 0
 		case OPCODE_ORI:
 			TRACE_OPCODE("ori");
-			TRACE_RD();
+			TRACE_RT();
 			TRACE_RS();
+			TRACE_IMM();
+			reg[rt] = reg[rs] | uimmediate;
+			TRACE_RESULT_RT();
 			break;
 		case OPCODE_XORI:
 			TRACE_OPCODE("xori");
-			TRACE_RD();
-			TRACE_RS();
 			TRACE_RT();
+			TRACE_RS();
+			TRACE_IMM();
+			reg[rt] = reg[rs] ^ uimmediate;
+			TRACE_RESULT_RT();
 			break;
-#endif
 		case OPCODE_LUI:
 			TRACE_OPCODE("lui");
 			TRACE_RT();
