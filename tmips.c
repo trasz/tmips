@@ -2,7 +2,9 @@
 #include <sys/endian.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -345,9 +347,17 @@ run(int *pc)
 				TRACE_RS();
 				TRACE_RT();
 				break;
+#endif
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
+				fprintf(stderr, "(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
+				    reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				reg[7] = __syscall(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				if (reg[7] != 0)
+					reg[2] = errno;
+				fprintf(stderr, " = %ld; errno %d", reg[7], errno);
 				break;
+#if 0
 			case FUNCT_SPECIAL_BREAK:
 				TRACE_OPCODE("break");
 				break;
