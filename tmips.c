@@ -64,10 +64,6 @@
 		fprintf(stderr, "%d", sa);							\
 	} while (0)
 
-#define	TRACE_JUMP()	do {									\
-		fprintf(stderr, "%x", jump);							\
-	} while (0)
-
 #define	TRACE_STR(STR)	fprintf(stderr, "   \t# %s", STR)
 
 static const char *register_names[32] = {
@@ -255,6 +251,37 @@ initial_stack_pointer(void)
 	return ((int64_t)&bar);
 }
 
+static void
+htobe64_addr(void *addr)
+{
+
+	*((uint64_t *)addr) = htobe64(*((uint64_t *)addr));
+}
+
+static inline int64_t
+do_syscall(int64_t number, int64_t a0, int64_t a1, int64_t a2,
+    int64_t a3, int64_t a4, int64_t a5)
+{
+	int error;
+
+#ifdef TRACE
+	fprintf(stderr, "(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
+	    number, a0, a1, a2, a3, a4, a5);
+#endif
+	error = __syscall(number, a0, a1, a2, a3, a4, a5);
+	if (error == 0) {
+		switch (number) {
+		case SYS_thr_self:
+			htobe64_addr((void *)a0);
+			break;
+		}
+	}
+#ifdef TRACE
+	fprintf(stderr, " = %ld; errno %d", a4, errno);
+#endif
+	return (error);
+}
+
 static int
 run(int *pc)
 {
@@ -262,7 +289,7 @@ run(int *pc)
 	int64_t reg[32], hi, lo;
 
 	// Temporaries.
-	uint32_t rs, rt, rd, sa, instruction, jump, opcode, funct;
+	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
 	int *next_pc;
@@ -276,7 +303,6 @@ run(int *pc)
 	next_pc = pc + 1;
 
 	for (;;) {
-		//fprintf(stderr, "\npc %p, next %p", pc, next_pc);
 		instruction = be32toh(*pc);
 
 		opcode = (instruction & (0x3F << 26)) >> 26;
@@ -288,8 +314,6 @@ run(int *pc)
 
 		immediate = (instruction << 16) >> 16;
 		uimmediate = (immediate << 16) >> 16;
-
-		jump = instruction & 0x3FFFFFF;
 
 		switch (opcode) {
 		case OPCODE_SPECIAL:
@@ -375,16 +399,9 @@ run(int *pc)
 #endif
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
-#ifdef TRACE
-				fprintf(stderr, "(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
-				    reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
-#endif
-				reg[7] = __syscall(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				reg[7] = do_syscall(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
 				if (reg[7] != 0)
 					reg[2] = errno;
-#ifdef TRACE
-				fprintf(stderr, " = %ld; errno %d", reg[7], errno);
-#endif
 				break;
 #if 0
 			case FUNCT_SPECIAL_BREAK:
