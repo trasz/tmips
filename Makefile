@@ -4,7 +4,7 @@ default: all
 
 all: tmips
 
-tmips: tmips.c
+tmips: tmips.c mips.c
 	$(CC) $(CFLAGS) -o tmips tmips.c
 
 clean:

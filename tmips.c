@@ -2,6 +2,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -9,12 +10,15 @@
 #include <libelf.h>
 #include <unistd.h>
 
+#define	TRACE
+#include "mips.c"
+#undef	TRACE
 #include "mips.c"
 
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: tmips binary-path\n");
+	fprintf(stderr, "usage: tmips [-t] binary-path\n");
 	exit(1);
 }
 
@@ -28,12 +32,26 @@ main(int argc, char **argv)
 	int *binary;
 	size_t nsections;
 	ssize_t nread;
-	int fd, error, i;
+	bool tflag;
+	int ch, fd, error, i;
 
-	if (argc != 2)
+	while ((ch = getopt(argc, argv, "t")) != -1) {
+		switch (ch) {
+		case 't':
+			tflag = true;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+	if (argc != 1)
 		usage();
 
-	path = argv[1];
+	path = argv[0];
 	fd = open(path, O_RDONLY);
 	if (fd < 0)
 		err(1, "%s", path);
@@ -81,6 +99,9 @@ main(int argc, char **argv)
 	}
 
 	close(fd);
+
+	if (tflag)
+		return (run_trace((int *)ehdr->e_entry));
 
 	return (run((int *)ehdr->e_entry));
 }

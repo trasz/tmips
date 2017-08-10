@@ -12,8 +12,17 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef TRACE
+#define	RUN run_trace
+#define	DO_SYSCALL do_syscall_trace
+#else
+#undef	RUN
+#define	RUN run
+#undef	DO_SYSCALL
+#define	DO_SYSCALL do_syscall
+#endif
+
 #define	STACK_PAGES	3
-//#define	TRACE
 #define	DIE_ON_UNKNOWN
 
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
@@ -82,18 +91,31 @@ register_name(int i)
 }
 
 #else /* !TRACE */
+#undef	TRACE_OPCODE
 #define TRACE_OPCODE(X)
+#undef	TRACE_RD
 #define TRACE_RD()
+#undef	TRACE_RS
 #define TRACE_RS()
+#undef	TRACE_RT
 #define TRACE_RT()
+#undef	TRACE_SA
 #define TRACE_SA()
+#undef	TRACE_RESULT_REG
 #define TRACE_RESULT_REG(X)
+#undef	TRACE_RESULT_RT
 #define TRACE_RESULT_RT()
+#undef	TRACE_RESULT_RD
 #define TRACE_RESULT_RD()
+#undef	TRACE_IMM_REG
 #define TRACE_IMM_REG(X)
+#undef	TRACE_IMM_RS
 #define TRACE_IMM_RS()
+#undef	TRACE_IMM
 #define TRACE_IMM()
+#undef	TRACE_JUMP
 #define TRACE_JUMP()
+#undef	TRACE_STR
 #define TRACE_STR(X)
 #endif /* !TRACE */
 
@@ -239,6 +261,8 @@ register_name(int i)
 #define	OPCODE_SDC2	0x3e
 #define	OPCODE_SD	0x3f
 
+#ifndef	MIPS_C
+#define	MIPS_C
 static int64_t
 initial_stack_pointer(void)
 {
@@ -277,15 +301,16 @@ be64toh_addr(uint64_t *addr)
 
 	*((uint64_t *)addr) = be64toh(*((uint64_t *)addr));
 }
+#endif /* !MIPS_C */
 
 static inline int64_t
-do_syscall(int64_t number, int64_t a0, int64_t a1, int64_t a2,
+DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
     int64_t a3, int64_t a4, int64_t a5)
 {
 	int error, i;
 
 #ifdef TRACE
-	fprintf(stderr, "(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
+	fprintf(stderr, "        \t# syscall(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
 	    number, a0, a1, a2, a3, a4, a5);
 #endif
 	switch (number) {
@@ -328,7 +353,7 @@ do_syscall(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 }
 
 static int
-run(int *pc)
+RUN(int *pc)
 {
 	// CPU context.
 	int64_t reg[32], hi, lo;
@@ -444,7 +469,7 @@ run(int *pc)
 #endif
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
-				reg[7] = do_syscall(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				reg[7] = DO_SYSCALL(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
 				if (reg[7] != 0)
 					reg[2] = errno;
 				break;
