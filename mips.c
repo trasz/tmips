@@ -198,6 +198,7 @@ register_name(int i)
 #define	OPCODE_REGIMM	0x01
 
 #define	FUNCT_REGIMM_BLTZ	0x00
+#define	FUNCT_REGIMM_BGEZ	0x01
 #define	FUNCT_REGIMM_BGEZL	0x03
 #define	FUNCT_REGIMM_BAL	0x11
 
@@ -221,6 +222,7 @@ register_name(int i)
 
 #define	OPCODE_BEQL	0x14
 #define	OPCODE_BNEL	0x15
+#define	OPCODE_BGTZL	0x17
 #define	OPCODE_DADDIU	0x19
 
 #define	OPCODE_LDL	0x1a
@@ -254,6 +256,7 @@ register_name(int i)
 #define	OPCODE_LWC2	0x32
 #define	OPCODE_PREF	0x33
 
+#define	OPCODE_LLD	0x34
 #define	OPCODE_LDC1	0x35
 #define	OPCODE_LDC2	0x36
 #define	OPCODE_LD	0x37
@@ -262,6 +265,7 @@ register_name(int i)
 #define	OPCODE_SWC1	0x39
 #define	OPCODE_SWC2	0x3a
 
+#define	OPCODE_SCD	0x3c
 #define	OPCODE_SDC1	0x3d
 #define	OPCODE_SDC2	0x3e
 #define	OPCODE_SD	0x3f
@@ -587,12 +591,14 @@ RUN(int *pc, int argc, char **argv)
 				lo = (int32_t)reg[rs] * (int32_t)reg[rt];
 				hi = 0; // XXX
 				break;
-#if 0
 			case FUNCT_SPECIAL_MULTU:
 				TRACE_OPCODE("multu");
 				TRACE_RS();
 				TRACE_RT();
+				lo = (uint32_t)reg[rs] * (uint32_t)reg[rt];
+				hi = 0; // XXX
 				break;
+#if 0
 			case FUNCT_SPECIAL_DIV:
 				TRACE_OPCODE("div");
 				TRACE_RS();
@@ -855,6 +861,18 @@ RUN(int *pc, int argc, char **argv)
 					continue;
 				}
 				break;
+			case FUNCT_REGIMM_BGEZ:
+				TRACE_OPCODE("bgez");
+				TRACE_RS();
+				TRACE_IMM();
+				if (reg[rs] >= 0) {
+					pc++;
+					// We're not shifting left by two, because pc is already an (int *).
+					next_pc = next_pc + immediate;
+					TRACE_STR("taken");
+					continue;
+				}
+				break;
 			case FUNCT_REGIMM_BGEZL:
 				TRACE_OPCODE("bgezl");
 				TRACE_RS();
@@ -1051,6 +1069,22 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_STR("not taken; delay slot skipped");
 			}
 			continue;
+		case OPCODE_BGTZL:
+			TRACE_OPCODE("bgtzl");
+			TRACE_RS();
+			TRACE_IMM();
+			if (reg[rs] > 0) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + immediate;
+				TRACE_STR("taken");
+			} else {
+				// Skip the delay slot.
+				pc += 2;
+				next_pc = pc + 1;
+				TRACE_STR("not taken; delay slot skipped");
+			}
+			continue;
 		case OPCODE_DADDIU:
 			TRACE_OPCODE("daddiu");
 			TRACE_RT();
@@ -1212,6 +1246,15 @@ RUN(int *pc, int argc, char **argv)
 		case OPCODE_PREF:
 			TRACE_OPCODE("pref");
 			break;
+#endif
+		case OPCODE_LLD:
+			TRACE_OPCODE("lld");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			reg[rt] = be64toh(*(int64_t *)(((char *)reg[rs] + immediate)));
+			TRACE_RESULT_RT();
+			break;
+#if 0
 		case OPCODE_LDC1:
 			TRACE_OPCODE("ldc1");
 			break;
@@ -1231,6 +1274,8 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM_RS();
 			*((int32_t *)((char *)(reg[rs]) + immediate)) = htobe32(reg[rt]);
+			reg[rt] = 1;
+			TRACE_RESULT_RT();
 			break;
 #if 0
 		case OPCODE_SWC1:
@@ -1241,6 +1286,16 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("swc2");
 			TRACE_RT();
 			break;
+#endif
+		case OPCODE_SCD:
+			TRACE_OPCODE("scd");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
+			reg[rt] = 1;
+			TRACE_RESULT_RT();
+			break;
+#if 0
 		case OPCODE_SDC1:
 			TRACE_OPCODE("sdc1");
 			break;
