@@ -225,6 +225,9 @@ register_name(int i)
 
 #define	OPCODE_LDL	0x1a
 #define	OPCODE_LDR	0x1b
+#define	OPCODE_SPECIAL3	0x1f
+
+#define	FUNCT_SPECIAL3_RDHWR	0x3b
 
 #define	OPCODE_LB	0x20
 #define	OPCODE_LH	0x21
@@ -309,7 +312,8 @@ static inline int64_t
 DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
     int64_t a3, int64_t a4, int64_t a5)
 {
-	int error, i;
+	off_t rv;
+	int i;
 
 #ifdef TRACE
 	fprintf(stderr, "        \t# syscall(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
@@ -334,50 +338,50 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 			be32toh_addr((uint32_t *)a1);
 		break;
 	}
-	error = __syscall(number, a0, a1, a2, a3, a4, a5);
-	if (error == 0) {
-		switch (number) {
-		case SYS___sysctl:
-			if (a1 == 2 && *((uint32_t *)a0) == 0 && *((uint32_t *)a0 + 1) == 3) {
-				/* It's sysctl.name2oid, used by sysctlnametomib(3).  Yeah, sorry. */
-				for (i = 0; i < *(int64_t *)a3 / 4; i++)
-					htobe32_addr((uint32_t *)a2 + i);
-			} else if (*(uint64_t *)a3 == 4) {
-				htobe32_addr((uint32_t *)a2);
-			} else if (*(uint64_t *)a3 == 8) {
-				htobe64_addr((uint64_t *)a2);
-			}
-			for (i = 0; i < a1; i++)
-				htobe32_addr((uint32_t *)a0 + i);
-			htobe64_addr((uint64_t *)a3);
-			break;
-		case SYS_sigaction:
-			if (a1 != 0) {
-				htobe64_addr((uint64_t *)a1);
-				htobe64_addr((uint64_t *)(a1 + 7));
-				htobe32_addr((uint32_t *)(a1 + 15));
-				htobe32_addr((uint32_t *)(a1 + 19));
-			}
-			if (a2 != 0) {
-				htobe64_addr((uint64_t *)a2);
-				htobe64_addr((uint64_t *)(a2 + 7));
-				htobe32_addr((uint32_t *)(a2 + 15));
-				htobe32_addr((uint32_t *)(a2 + 19));
-			}
-			break;
-		case SYS_sigprocmask:
-			if (a2 != 0)
-				htobe32_addr((uint32_t *)a2);
-			break;
-		case SYS_thr_self:
-			htobe64_addr((uint64_t *)a0);
-			break;
+
+	rv = __syscall(number, a0, a1, a2, a3, a4, a5);
+
+	switch (number) {
+	case SYS___sysctl:
+		if (a1 == 2 && *((uint32_t *)a0) == 0 && *((uint32_t *)a0 + 1) == 3) {
+			/* It's sysctl.name2oid, used by sysctlnametomib(3).  Yeah, sorry. */
+			for (i = 0; i < *(int64_t *)a3 / 4; i++)
+				htobe32_addr((uint32_t *)a2 + i);
+		} else if (*(uint64_t *)a3 == 4) {
+			htobe32_addr((uint32_t *)a2);
+		} else if (*(uint64_t *)a3 == 8) {
+			htobe64_addr((uint64_t *)a2);
 		}
+		for (i = 0; i < a1; i++)
+			htobe32_addr((uint32_t *)a0 + i);
+		htobe64_addr((uint64_t *)a3);
+		break;
+	case SYS_sigaction:
+		if (a1 != 0) {
+			htobe64_addr((uint64_t *)a1);
+			htobe64_addr((uint64_t *)(a1 + 7));
+			htobe32_addr((uint32_t *)(a1 + 15));
+			htobe32_addr((uint32_t *)(a1 + 19));
+		}
+		if (a2 != 0) {
+			htobe64_addr((uint64_t *)a2);
+			htobe64_addr((uint64_t *)(a2 + 7));
+			htobe32_addr((uint32_t *)(a2 + 15));
+			htobe32_addr((uint32_t *)(a2 + 19));
+		}
+		break;
+	case SYS_sigprocmask:
+		if (a2 != 0)
+			htobe32_addr((uint32_t *)a2);
+		break;
+	case SYS_thr_self:
+		htobe64_addr((uint64_t *)a0);
+		break;
 	}
 #ifdef TRACE
-	fprintf(stderr, " = %ld; errno %d", a4, errno);
+	fprintf(stderr, " = %#018lx (%ld); errno %d", rv, rv, errno);
 #endif
-	return (error);
+	return (rv);
 }
 
 static int
@@ -509,9 +513,16 @@ RUN(int *pc, int argc, char **argv)
 #endif
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
+				errno = 0;
 				reg[7] = DO_SYSCALL(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
-				if (reg[7] != 0)
+				// po mmap wartosc ma byc w reg[2]
+				//if (reg[7] != 0)
+				if (errno != 0) {
 					reg[2] = errno;
+				} else {
+					reg[2] = reg[7];
+					reg[7] = 0;
+				}
 				break;
 #if 0
 			case FUNCT_SPECIAL_BREAK:
@@ -1064,6 +1075,27 @@ RUN(int *pc, int argc, char **argv)
 			reg[rt] = be64toh(*((int64_t *)((char *)(reg[rs]) + immediate)));
 			TRACE_RESULT_RT();
 			break;
+		case OPCODE_SPECIAL3:
+			funct = instruction & 0x3F;
+
+			switch (funct) {
+			case FUNCT_SPECIAL3_RDHWR:
+			TRACE_OPCODE("rdhwr");
+			TRACE_RT();
+			reg[rt] = 0; // XXX
+			TRACE_RESULT_RT();
+			break;
+			default:
+#ifdef DIE_ON_UNKNOWN
+				fprintf(stderr, "\n");
+				errx(1, "unknown special3 opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+#else
+				TRACE_OPCODE("SPECIAL");
+				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
+#endif
+				break;
+			}
+			break;
 		case OPCODE_LB:
 			TRACE_OPCODE("lb");
 			TRACE_RT();
@@ -1094,12 +1126,14 @@ RUN(int *pc, int argc, char **argv)
 			reg[rt] = *(uint8_t *)(((char *)reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
-#if 0
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
 			TRACE_RT();
-			TRACE_IMM();
+			TRACE_IMM_RS();
+			reg[rt] = *(uint16_t *)(reg[rs] + immediate);
+			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_LWR:
 			TRACE_OPCODE("lwr");
 			TRACE_RT();
@@ -1118,11 +1152,13 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_IMM_RS();
 			*((int8_t *)((char *)(reg[rs]) + immediate)) = reg[rt];
 			break;
-#if 0
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
 			TRACE_RT();
+			TRACE_IMM_RS();
+			*(uint16_t *)(reg[rs] + immediate) = reg[rt];
 			break;
+#if 0
 		case OPCODE_SWL:
 			TRACE_OPCODE("swl");
 			TRACE_RT();
