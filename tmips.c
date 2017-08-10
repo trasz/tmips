@@ -101,8 +101,8 @@ main(int argc, char **argv)
 	close(fd);
 
 	if (tflag)
-		return (run_trace((int *)ehdr->e_entry));
+		return (run_trace((int *)ehdr->e_entry, argc, argv));
 
-	return (run((int *)ehdr->e_entry));
+	return (run((int *)ehdr->e_entry, argc, argv));
 }
 

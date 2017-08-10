@@ -12,6 +12,8 @@
 #include <string.h>
 #include <unistd.h>
 
+extern char **environ;
+
 #ifdef TRACE
 #define	RUN run_trace
 #define	DO_SYSCALL do_syscall_trace
@@ -379,25 +381,37 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 }
 
 static int
-RUN(int *pc)
+RUN(int *pc, int argc, char **argv)
 {
 	// CPU context.
 	int64_t reg[32], hi, lo;
+	char **ps_strings;
 
 	// Temporaries.
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
-	int *next_pc;
+	int i, *next_pc;
 
+	// Set up the strings.
+	ps_strings = (char **)initial_stack_pointer();
+	printf("ps_strings at %p, argc %d\n", (void *)ps_strings, argc);
+	ps_strings[0] = (char *)htobe64((uint64_t)argc);
+	for (i = 0; i < argc; i++)
+		ps_strings[i + 1] = (char *)htobe64((uint64_t)argv[i]);
+	//ps_strings[i + 1] = (char *)htobe64(environ);
+	ps_strings[i + 1] = 0;
+
+	// Set up the initial CPU state.
 	memset(reg, 0, sizeof(reg));
 	reg[0] = 0;
-	reg[4] = initial_stack_pointer();
+	reg[4] = (int64_t)ps_strings;
 	reg[25] = (int64_t)pc;
-	reg[29] = reg[4];
+	reg[29] = (int64_t)ps_strings + i + 2;
 
 	next_pc = pc + 1;
 
+	// Run!
 	for (;;) {
 		instruction = be32toh(*pc);
 
