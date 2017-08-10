@@ -317,11 +317,19 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 	case SYS___sysctl:
 		for (i = 0; i < a1; i++)
 			be32toh_addr((uint32_t *)a0 + i);
-
-			be32toh_addr((uint32_t *)a0 + i);
-
 		be64toh_addr((uint64_t *)a3);
-
+		break;
+	case SYS_sigaction:
+		if (a1 != 0) {
+			be64toh_addr((uint64_t *)a1);
+			be64toh_addr((uint64_t *)(a1 + 7));
+			be32toh_addr((uint32_t *)(a1 + 15));
+			be32toh_addr((uint32_t *)(a1 + 19));
+		}
+		break;
+	case SYS_sigprocmask:
+		if (a1 != 0)
+			be32toh_addr((uint32_t *)a1);
 		break;
 	}
 	error = __syscall(number, a0, a1, a2, a3, a4, a5);
@@ -340,6 +348,24 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 			for (i = 0; i < a1; i++)
 				htobe32_addr((uint32_t *)a0 + i);
 			htobe64_addr((uint64_t *)a3);
+			break;
+		case SYS_sigaction:
+			if (a1 != 0) {
+				htobe64_addr((uint64_t *)a1);
+				htobe64_addr((uint64_t *)(a1 + 7));
+				htobe32_addr((uint32_t *)(a1 + 15));
+				htobe32_addr((uint32_t *)(a1 + 19));
+			}
+			if (a2 != 0) {
+				htobe64_addr((uint64_t *)a2);
+				htobe64_addr((uint64_t *)(a2 + 7));
+				htobe32_addr((uint32_t *)(a2 + 15));
+				htobe32_addr((uint32_t *)(a2 + 19));
+			}
+			break;
+		case SYS_sigprocmask:
+			if (a2 != 0)
+				htobe32_addr((uint32_t *)a2);
 			break;
 		case SYS_thr_self:
 			htobe64_addr((uint64_t *)a0);
