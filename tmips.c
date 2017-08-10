@@ -252,27 +252,73 @@ initial_stack_pointer(void)
 }
 
 static void
-htobe64_addr(void *addr)
+htobe32_addr(uint32_t *addr)
+{
+
+	*((uint32_t *)addr) = htobe32(*((uint32_t *)addr));
+}
+
+static void
+htobe64_addr(uint64_t *addr)
 {
 
 	*((uint64_t *)addr) = htobe64(*((uint64_t *)addr));
+}
+
+static void
+be32toh_addr(uint32_t *addr)
+{
+
+	*((uint32_t *)addr) = be32toh(*((uint32_t *)addr));
+}
+
+static void
+be64toh_addr(uint64_t *addr)
+{
+
+	*((uint64_t *)addr) = be64toh(*((uint64_t *)addr));
 }
 
 static inline int64_t
 do_syscall(int64_t number, int64_t a0, int64_t a1, int64_t a2,
     int64_t a3, int64_t a4, int64_t a5)
 {
-	int error;
+	int error, i;
 
 #ifdef TRACE
 	fprintf(stderr, "(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
 	    number, a0, a1, a2, a3, a4, a5);
 #endif
+	switch (number) {
+	case SYS___sysctl:
+		for (i = 0; i < a1; i++)
+			be32toh_addr((uint32_t *)a0 + i);
+
+			be32toh_addr((uint32_t *)a0 + i);
+
+		be64toh_addr((uint64_t *)a3);
+
+		break;
+	}
 	error = __syscall(number, a0, a1, a2, a3, a4, a5);
 	if (error == 0) {
 		switch (number) {
+		case SYS___sysctl:
+			if (a1 == 2 && *((uint32_t *)a0) == 0 && *((uint32_t *)a0 + 1) == 3) {
+				/* It's sysctl.name2oid, used by sysctlnametomib(3).  Yeah, sorry. */
+				for (i = 0; i < *(int64_t *)a3 / 4; i++)
+					htobe32_addr((uint32_t *)a2 + i);
+			} else if (*(uint64_t *)a3 == 4) {
+				htobe32_addr((uint32_t *)a2);
+			} else if (*(uint64_t *)a3 == 8) {
+				htobe64_addr((uint64_t *)a2);
+			}
+			for (i = 0; i < a1; i++)
+				htobe32_addr((uint32_t *)a0 + i);
+			htobe64_addr((uint64_t *)a3);
+			break;
 		case SYS_thr_self:
-			htobe64_addr((void *)a0);
+			htobe64_addr((uint64_t *)a0);
 			break;
 		}
 	}
@@ -569,14 +615,17 @@ run(int *pc)
 				reg[rd] = ~(reg[rs] | reg[rt]);
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_SLT:
 				TRACE_OPCODE("slt");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
+				if ((uint64_t)reg[rs] < (uint64_t)reg[rt])
+					reg[rd] = 1;
+				else
+					reg[rd] = 0;
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_SLTU:
 				TRACE_OPCODE("sltu");
 				TRACE_RD();
@@ -1190,6 +1239,8 @@ main(int argc, char **argv)
 		if (nread != (ssize_t)phdr[i].p_filesz)
 			err(1, "read");
 	}
+
+	close(fd);
 
 	return (run((int *)ehdr->e_entry));
 }
