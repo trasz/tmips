@@ -593,15 +593,17 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_OPCODE("mult");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (int32_t)reg[rs] * (int32_t)reg[rt];
-				hi = 0; // XXX
+				lo = (int64_t)((int32_t)reg[rs]) * (uint32_t)reg[rt];
+				hi = lo & (0xffffffffll << 32);
+				lo = hi & 0xffffffff;
 				break;
 			case FUNCT_SPECIAL_MULTU:
 				TRACE_OPCODE("multu");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (uint32_t)reg[rs] * (uint32_t)reg[rt];
-				hi = 0; // XXX
+				lo = (uint64_t)(int32_t)reg[rs] * (uint32_t)reg[rt];
+				hi = lo & (0xffffffffll << 32);
+				lo = hi & 0xffffffff;
 				break;
 #if 0
 			case FUNCT_SPECIAL_DIV:
@@ -1120,8 +1122,10 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("ldr");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			// XXX: Questionable.
-			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
+			/*
+			 * This is a highly optimized implementation that depends
+			 * on ldl doing all the work.
+			 */
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SPECIAL3:
@@ -1230,8 +1234,10 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sdr");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			// XXX: Questionable.
-			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
+			/*
+			 * This is a highly optimized implementation that depends
+			 * on sdl doing all the work.
+			 */
 			break;
 #if 0
 		case OPCODE_SWR:
