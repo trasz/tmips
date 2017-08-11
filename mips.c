@@ -399,16 +399,19 @@ RUN(int *pc, int argc, char **argv)
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
-	int i, *next_pc;
+	int i, j, *next_pc;
 
 	// Set up the strings.
+	i = 0;
 	ps_strings = (char **)initial_stack_pointer();
-	printf("ps_strings at %p, argc %d\n", (void *)ps_strings, argc);
-	ps_strings[0] = (char *)htobe64((uint64_t)argc);
-	for (i = 0; i < argc; i++)
-		ps_strings[i + 1] = (char *)htobe64((uint64_t)argv[i]);
-	//ps_strings[i + 1] = (char *)htobe64(environ);
-	ps_strings[i + 1] = 0;
+	fprintf(stderr, "ps_strings at %p, argc %d\n", (void *)ps_strings, argc);
+	ps_strings[i++] = (char *)htobe64((uint64_t)argc);
+	for (j = 0; j < argc; j++)
+		ps_strings[i++] = (char *)htobe64((uint64_t)argv[j]);
+	ps_strings[i++] = 0;
+	for (j = 0; environ[j] != '\0'; j++)
+		ps_strings[i++] = (char *)htobe64((uint64_t)environ[j]);
+	ps_strings[i++] = 0;
 
 	// Set up the initial CPU state.
 	memset(reg, 0, sizeof(reg));
