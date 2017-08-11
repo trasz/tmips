@@ -459,7 +459,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = reg[rt] >> sa;
+				reg[rd] = (int32_t)reg[rt] >> sa;
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SLLV:
@@ -475,7 +475,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
-				reg[rd] = reg[rt] > reg[rs];
+				reg[rd] = (uint32_t)reg[rt] > reg[rs];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -518,7 +518,12 @@ RUN(int *pc, int argc, char **argv)
 			case FUNCT_SPECIAL_SYSCALL:
 				TRACE_OPCODE("syscall");
 				errno = 0;
-				reg[7] = DO_SYSCALL(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				if (reg[2] == 0) {
+					// XXX: Without this special case, things die with ENOSYS.
+					reg[7] = DO_SYSCALL(reg[4], reg[5], reg[6], reg[7], reg[8], reg[9], 0);
+				} else {
+					reg[7] = DO_SYSCALL(reg[2], reg[4], reg[5], reg[6], reg[7], reg[8], reg[9]);
+				}
 				// po mmap wartosc ma byc w reg[2]
 				//if (reg[7] != 0)
 				if (errno != 0) {
@@ -617,12 +622,14 @@ RUN(int *pc, int argc, char **argv)
 				lo = reg[rs] * reg[rt];
 				hi = 0; // XXX
 				break;
-#if 0
 			case FUNCT_SPECIAL_DMULTU:
 				TRACE_OPCODE("dmultu");
 				TRACE_RS();
 				TRACE_RT();
+				lo = (uint64_t)reg[rs] * (uint64_t)reg[rt];
+				hi = 0; // XXX
 				break;
+#if 0
 			case FUNCT_SPECIAL_DDIV:
 				TRACE_OPCODE("ddiv");
 				TRACE_RS();
@@ -642,6 +649,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_RT();
 				reg[rd] = reg[rs] + reg[rt];
+				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_ADDU:
 				TRACE_OPCODE("addu");
@@ -701,7 +709,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				if ((uint64_t)reg[rs] < (uint64_t)reg[rt])
+				if (reg[rs] < reg[rt])
 					reg[rd] = 1;
 				else
 					reg[rd] = 0;
@@ -747,7 +755,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = reg[rs] - reg[rt];
+				reg[rd] = (uint64_t)reg[rs] - (uint64_t)reg[rt];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -822,7 +830,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = reg[rt] >> (sa + 32);
+				reg[rd] = (uint64_t)reg[rt] >> (sa + 32);
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRA32:
@@ -830,7 +838,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = reg[rt] >> (32 + sa);
+				reg[rd] = reg[rt] >> (sa + 32);
 				TRACE_RESULT_RD();
 				break;
 			default:
@@ -961,18 +969,25 @@ RUN(int *pc, int argc, char **argv)
 			}
 			TRACE_STR("not taken");
 			break;
-#if 0
 		case OPCODE_BGTZ:
 			TRACE_OPCODE("bgtz");
 			TRACE_RS();
+			TRACE_IMM();
+			if (reg[rs] > 0) {
+				pc++;
+				// We're not shifting left by two, because pc is already an (int *).
+				next_pc = next_pc + immediate;
+				TRACE_STR("taken");
+				continue;
+			}
+			TRACE_STR("not taken");
 			break;
-#endif
 		case OPCODE_ADDI:
 			TRACE_OPCODE("addi");
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			reg[rt] = reg[rs] + immediate;
+			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
 			break;
 		case OPCODE_ADDIU:
 			TRACE_OPCODE("addiu");
@@ -1098,7 +1113,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			reg[rt] = be64toh(*((int64_t *)((char *)(reg[rs]) + immediate)));
+			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LDR:
@@ -1106,7 +1121,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			reg[rt] = be64toh(*((int64_t *)((char *)(reg[rs]) + immediate)));
+			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SPECIAL3:
@@ -1134,7 +1149,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lb");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *(int8_t *)(((char *)reg[rs] + immediate));
+			reg[rt] = *((int8_t *)(reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1150,21 +1165,21 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lw");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be32toh(*(int32_t *)(((char *)reg[rs] + immediate)));
+			reg[rt] = be32toh(*((int32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LBU:
 			TRACE_OPCODE("lbu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *(uint8_t *)(((char *)reg[rs] + immediate));
+			reg[rt] = *((uint8_t *)(reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *(uint16_t *)(reg[rs] + immediate);
+			reg[rt] = be16toh(*((uint16_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1177,20 +1192,20 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lwu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *(uint16_t *)(((char *)reg[rs] + immediate));
+			reg[rt] = be32toh(*((uint32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int8_t *)((char *)(reg[rs]) + immediate)) = reg[rt];
+			*((int8_t *)(reg[rs] + immediate)) = reg[rt];
 			break;
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*(uint16_t *)(reg[rs] + immediate) = reg[rt];
+			*((uint16_t *)(reg[rs] + immediate)) = htobe16(reg[rt]);
 			break;
 #if 0
 		case OPCODE_SWL:
@@ -1202,21 +1217,21 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sw");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int32_t *)((char *)(reg[rs]) + immediate)) = htobe32(reg[rt]);
+			*((int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
 			break;
 		case OPCODE_SDL:
 			TRACE_OPCODE("sdl");
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
+			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			break;
 		case OPCODE_SDR:
 			TRACE_OPCODE("sdr");
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
+			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			break;
 #if 0
 		case OPCODE_SWR:
@@ -1231,7 +1246,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("ll");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be32toh(*(int32_t *)(((char *)reg[rs] + immediate)));
+			reg[rt] = be32toh(*((int32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1251,7 +1266,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lld");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be64toh(*(int64_t *)(((char *)reg[rs] + immediate)));
+			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1266,14 +1281,14 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("ld");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be64toh(*(int64_t *)(((char *)reg[rs] + immediate)));
+			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int32_t *)((char *)(reg[rs]) + immediate)) = htobe32(reg[rt]);
+			*((int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
 			reg[rt] = 1;
 			TRACE_RESULT_RT();
 			break;
@@ -1291,7 +1306,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("scd");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
+			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			reg[rt] = 1;
 			TRACE_RESULT_RT();
 			break;
@@ -1307,7 +1322,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sd");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int64_t *)((char *)(reg[rs]) + immediate)) = htobe64(reg[rt]);
+			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			break;
 		default:
 #ifdef DIE_ON_UNKNOWN
