@@ -15,7 +15,7 @@
 #undef	TRACE
 #include "mips.c"
 
-static void
+static void __dead2
 usage(void)
 {
 	fprintf(stderr, "usage: tmips [-t] binary-path\n");
@@ -32,7 +32,7 @@ main(int argc, char **argv)
 	void *addr;
 	size_t len, nsections;
 	ssize_t nread;
-	bool tflag;
+	bool tflag = false;
 	int ch, fd, error, i;
 
 	while ((ch = getopt(argc, argv, "t")) != -1) {
@@ -98,7 +98,7 @@ main(int argc, char **argv)
 		if (addr == MAP_FAILED)
 			err(1, "cannot map %zd bytes at %p", len, addr);
 
-		nread = pread(fd, (void *)phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_offset);
+		nread = pread(fd, (void *)phdr[i].p_vaddr, phdr[i].p_filesz, (off_t)phdr[i].p_offset);
 		if (nread != (ssize_t)phdr[i].p_filesz)
 			err(1, "read");
 	}

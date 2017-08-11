@@ -1,4 +1,4 @@
-CFLAGS+=	-Wall -pedantic -Wextra -O0 -ggdb -lelf
+CFLAGS+=	-Wall -Weverything -Wextra -Wno-sign-conversion -Wno-bad-function-cast -pedantic -O0 -ggdb -lelf
 
 default: all
 

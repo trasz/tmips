@@ -392,7 +392,7 @@ static int
 RUN(int *pc, int argc, char **argv)
 {
 	// CPU context.
-	int64_t reg[32], hi, lo;
+	int64_t reg[32], hi = 0, lo = 0;
 	char **ps_strings;
 
 	// Temporaries.
@@ -423,7 +423,7 @@ RUN(int *pc, int argc, char **argv)
 	for (;;) {
 		instruction = be32toh(*pc);
 
-		opcode = (instruction & (0x3F << 26)) >> 26;
+		opcode = (instruction & (0x3Ful << 26)) >> 26;
 
 		rs = (instruction & (0x1F << 21)) >> 21;
 		rt = (instruction & (0x1F << 16)) >> 16;
@@ -594,7 +594,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_RT();
 				lo = (int64_t)((int32_t)reg[rs]) * (uint32_t)reg[rt];
-				hi = lo & (0xffffffffll << 32);
+				hi = lo & (0xffffffffull << 32);
 				lo = hi & 0xffffffff;
 				break;
 			case FUNCT_SPECIAL_MULTU:
@@ -602,7 +602,7 @@ RUN(int *pc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_RT();
 				lo = (uint64_t)(int32_t)reg[rs] * (uint32_t)reg[rt];
-				hi = lo & (0xffffffffll << 32);
+				hi = lo & (0xffffffffull << 32);
 				lo = hi & 0xffffffff;
 				break;
 #if 0
@@ -1203,7 +1203,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sb");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int8_t *)(reg[rs] + immediate)) = reg[rt];
+			*((int8_t *)(reg[rs] + immediate)) = (int8_t)reg[rt];
 			break;
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
