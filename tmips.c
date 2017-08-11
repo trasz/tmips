@@ -29,8 +29,8 @@ main(int argc, char **argv)
 	Elf64_Ehdr *ehdr;
 	Elf64_Phdr *phdr;
 	const char *path;
-	int *binary;
-	size_t nsections;
+	void *addr;
+	size_t len, nsections;
 	ssize_t nread;
 	bool tflag;
 	int ch, fd, error, i;
@@ -67,7 +67,7 @@ main(int argc, char **argv)
 	if (ehdr == NULL)
 		errx(1, "elf64_getehdr: %s", elf_errmsg(-1));
 
-	printf("entry point at %#lx\n", ehdr->e_entry);
+	fprintf(stderr, "entry point at %#lx\n", ehdr->e_entry);
 
 	phdr = elf64_getphdr(elf);
 	if (phdr == NULL)
@@ -81,19 +81,24 @@ main(int argc, char **argv)
 		if (phdr[i].p_type != PT_LOAD)
 		       continue;
 
-		printf("section %d: p_offset %ld, p_vaddr %#lx, p_filesz %ld, p_memsz %ld, p_flags %#x\n",
+		fprintf(stderr, "section %d: p_offset %ld, p_vaddr %#lx, p_filesz %ld, p_memsz %ld, p_flags %#x\n",
 		    i, phdr[i].p_offset, phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_memsz, phdr[i].p_flags);
+
+		addr = (void *)rounddown2(phdr[i].p_vaddr, PAGE_SIZE);
+		len = roundup2(phdr[i].p_memsz + ((char *)phdr[i].p_vaddr - (char *)addr), PAGE_SIZE);
+
+		fprintf(stderr, "section %d: mapping %zd bytes at %p\n", i, len, addr);
 
 		/*
 		 * The fact that p_memsz is often different from p_filesz
 		 * makes mmap(2) rather non-trivial.
 		 */
-		binary = mmap((void *)phdr[i].p_vaddr, phdr[i].p_memsz, PROT_READ | PROT_WRITE,
+		addr = mmap(addr, len, PROT_READ | PROT_WRITE,
 		    MAP_ANON | MAP_FIXED | MAP_EXCL | MAP_PRIVATE, -1, 0);
-		if (binary == MAP_FAILED)
-			err(1, "cannot map %s at %p", path, (void *)phdr[i].p_vaddr);
+		if (addr == MAP_FAILED)
+			err(1, "cannot map %zd bytes at %p", len, addr);
 
-		nread = pread(fd, binary, phdr[i].p_filesz, phdr[i].p_offset);
+		nread = pread(fd, (void *)phdr[i].p_vaddr, phdr[i].p_filesz, phdr[i].p_offset);
 		if (nread != (ssize_t)phdr[i].p_filesz)
 			err(1, "read");
 	}
