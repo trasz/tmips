@@ -6,6 +6,9 @@ if [ $# -ne 2 ]; then
 fi
 
 ./objdump -d "$1" | awk '
+	BEGIN {
+		maxdepth = 5
+	}
 	NR == FNR && /^0/ {
 		gsub("[<>:]", "", $2)
 		symbol = $2
@@ -16,12 +19,15 @@ fi
 	}
 
 	NR != FNR {
-		printf "%-98s # %s %s\n", $0, text[$1], stack
+		printf "%-98s # %" maxdepth - depth "s%s %s\n", $0, "", text[$1], stack
 	}
 
 	NR != FNR && jalr_delay != 0 {
 		jalr_delay = 0
 		stack = text[$1] " " stack
+		depth++
+		if (depth > maxdepth)
+			maxdepth = depth
 	}
 
 	NR != FNR && $3 == "jalr" {
@@ -31,6 +37,7 @@ fi
 	NR != FNR && jr_delay != 0 {
 		jr_delay = 0
 		sub(/[^ ]+ /, "", stack)
+		depth--
 	}
 
 	NR != FNR && $3 == "jr" {
