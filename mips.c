@@ -447,6 +447,8 @@ RUN(int *pc, int argc, char **argv)
 
 	// Run!
 	for (;;) {
+		reg[0] = 0;
+
 		instruction = be32toh(*pc);
 
 		opcode = (instruction & (0x3Ful << 26)) >> 26;
