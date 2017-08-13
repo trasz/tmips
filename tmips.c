@@ -18,7 +18,7 @@
 static void __dead2
 usage(void)
 {
-	fprintf(stderr, "usage: tmips [-t] binary-path\n");
+	fprintf(stderr, "usage: tmips [-t] binary-path [binary-args ...]\n");
 	exit(1);
 }
 
@@ -48,7 +48,7 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc != 1)
+	if (argc < 1)
 		usage();
 
 	path = argv[0];
