@@ -33,13 +33,17 @@ extern char **environ;
 #define	TRACE_OPCODE(STR)	do {								\
 		fprintf(stderr, "\n%12llx:\t%08x\t%-7s ",					\
 		    (unsigned long long)pc, instruction, STR);					\
+		had_args = false;								\
 	} while (0)
 
 #define	TRACE_REG(REG)	do {									\
+		if (had_args == true)								\
+			fprintf(stderr, ",");							\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "%s,", register_name(REG));				\
+			fprintf(stderr, "%s", register_name(REG));				\
 		else										\
-			fprintf(stderr, "$%d,", REG);						\
+			fprintf(stderr, "$%d", REG);						\
+		had_args = true;								\
 	} while (0)
 
 #define	TRACE_RD()	TRACE_REG(rd)
@@ -58,20 +62,29 @@ extern char **environ;
 #define	TRACE_RESULT_RT()	TRACE_RESULT_REG(rt)
 
 #define	TRACE_IMM_REG(REG)	do {								\
+		if (had_args == true)								\
+			fprintf(stderr, ",");							\
 		if (register_name(REG) != NULL)							\
 			fprintf(stderr, "%d(%s)", immediate, register_name(REG));		\
 		else										\
 			fprintf(stderr, "%d($%d)", immediate, REG);				\
+		had_args = true;								\
 	} while (0)
 
 #define	TRACE_IMM_RS()	TRACE_IMM_REG(rs)
 
 #define	TRACE_IMM()	do {									\
+		if (had_args == true)								\
+			fprintf(stderr, ",");							\
 		fprintf(stderr, "%d", immediate);						\
+		had_args = true;								\
 	} while (0)
 
 #define	TRACE_SA()	do {									\
+		if (had_args == true)								\
+			fprintf(stderr, ",");							\
 		fprintf(stderr, "%d", sa);							\
+		had_args = true;								\
 	} while (0)
 
 #define	TRACE_STR(STR)	fprintf(stderr, "   \t# %s", STR)
@@ -272,6 +285,9 @@ register_name(int i)
 
 #ifndef	MIPS_C
 #define	MIPS_C
+
+static bool	had_args = false;
+
 static int64_t
 initial_stack_pointer(void)
 {
