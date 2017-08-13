@@ -5,5 +5,16 @@ if [ $# -ne 2 ]; then
 	exit 1
 fi
 
-./objdump -d "$1" | awk '/^0/ { gsub("[<>:]", "", $2); symbol=$2; } NR == FNR && /^ / { text[$1]=symbol } NR != FNR { printf "%-98s # %s\n", $0, text[$1] }' - "$2"
+./objdump -d "$1" | awk '
+	/^0/ {
+		gsub("[<>:]", "", $2); symbol=$2;
+	}
+
+	NR == FNR && /^ / {
+		text[$1]=symbol
+	}
+
+	NR != FNR {
+		printf "%-98s # %s\n", $0, text[$1]
+}' - "$2"
 
