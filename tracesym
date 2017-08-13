@@ -6,15 +6,36 @@ if [ $# -ne 2 ]; then
 fi
 
 ./objdump -d "$1" | awk '
-	/^0/ {
-		gsub("[<>:]", "", $2); symbol=$2;
+	NR == FNR && /^0/ {
+		gsub("[<>:]", "", $2)
+		symbol = $2
 	}
 
 	NR == FNR && /^ / {
-		text[$1]=symbol
+		text[$1] = symbol
 	}
 
 	NR != FNR {
-		printf "%-98s # %s\n", $0, text[$1]
-}' - "$2"
+		printf "%-98s # %s %s\n", $0, text[$1], stack
+	}
+
+	NR != FNR && jalr_delay != 0 {
+		jalr_delay = 0
+		stack = text[$1] " " stack
+	}
+
+	NR != FNR && $3 == "jalr" {
+		jalr_delay = 1
+	}
+
+	NR != FNR && jr_delay != 0 {
+		jr_delay = 0
+		sub(/[^ ]+ /, "", stack)
+	}
+
+	NR != FNR && $3 == "jr" {
+		jr_delay = 1
+	}
+
+' - "$2"
 
