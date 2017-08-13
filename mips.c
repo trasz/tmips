@@ -31,18 +31,18 @@ extern char **environ;
 
 #ifdef TRACE
 #define	TRACE_OPCODE(STR)	do {								\
-		fprintf(stderr, "\n%12llx:\t%08x\t%-7s ",					\
+		linelen = fprintf(stderr, "\n%12llx:   %08x        %-7s ",			\
 		    (unsigned long long)pc, instruction, STR);					\
 		had_args = false;								\
 	} while (0)
 
 #define	TRACE_REG(REG)	do {									\
 		if (had_args == true)								\
-			fprintf(stderr, ",");							\
+			linelen += fprintf(stderr, ",");					\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "%s", register_name(REG));				\
+			linelen += fprintf(stderr, "%s", register_name(REG));			\
 		else										\
-			fprintf(stderr, "$%d", REG);						\
+			linelen += fprintf(stderr, "$%d", REG);					\
 		had_args = true;								\
 	} while (0)
 
@@ -51,10 +51,13 @@ extern char **environ;
 #define	TRACE_RT()	TRACE_REG(rt)
 
 #define	TRACE_RESULT_REG(REG)	do {								\
+		fprintf(stderr, "%*s", 55 - linelen, "");					\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "   \t# %s := %#018lx (%ld)", register_name(REG), reg[REG], reg[REG]);	\
+			fprintf(stderr, "# %s := %#018lx (%ld)",				\
+			     register_name(REG), reg[REG], reg[REG]);				\
 		else										\
-			fprintf(stderr, "   \t# $%d := %#018lx (%ld)", REG, reg[REG], reg[REG]);\
+			fprintf(stderr, "# $%d := %#018lx (%ld)",				\
+			     REG, reg[REG], reg[REG]);						\
 	} while (0)
 
 #define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
@@ -63,11 +66,11 @@ extern char **environ;
 
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (had_args == true)								\
-			fprintf(stderr, ",");							\
+			linelen += fprintf(stderr, ",");					\
 		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "%d(%s)", immediate, register_name(REG));		\
+			linelen += fprintf(stderr, "%d(%s)", immediate, register_name(REG));	\
 		else										\
-			fprintf(stderr, "%d($%d)", immediate, REG);				\
+			linelen += fprintf(stderr, "%d($%d)", immediate, REG);			\
 		had_args = true;								\
 	} while (0)
 
@@ -75,19 +78,22 @@ extern char **environ;
 
 #define	TRACE_IMM()	do {									\
 		if (had_args == true)								\
-			fprintf(stderr, ",");							\
-		fprintf(stderr, "%d", immediate);						\
+			linelen += fprintf(stderr, ",");					\
+		linelen += fprintf(stderr, "%d", immediate);					\
 		had_args = true;								\
 	} while (0)
 
 #define	TRACE_SA()	do {									\
 		if (had_args == true)								\
-			fprintf(stderr, ",");							\
-		fprintf(stderr, "%d", sa);							\
+			linelen += fprintf(stderr, ",");					\
+		linelen += fprintf(stderr, "%d", sa);						\
 		had_args = true;								\
 	} while (0)
 
-#define	TRACE_STR(STR)	fprintf(stderr, "   \t# %s", STR)
+#define	TRACE_STR(STR)	do {									\
+		fprintf(stderr, "%*s", 55 - linelen, "");					\
+		fprintf(stderr, "# %s", STR);							\
+	} while (0)
 
 static const char *register_names[32] = {
 	"$0",   "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
@@ -287,6 +293,7 @@ register_name(int i)
 #define	MIPS_C
 
 static bool	had_args = false;
+static int	linelen;
 
 static int64_t
 initial_stack_pointer(void)
@@ -336,7 +343,7 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 	int i;
 
 #ifdef TRACE
-	fprintf(stderr, "        \t# syscall(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
+	fprintf(stderr, "              # syscall(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
 	    number, a0, a1, a2, a3, a4, a5);
 #endif
 	switch (number) {
