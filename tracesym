@@ -7,8 +7,9 @@ fi
 
 ./objdump -d "$1" | awk '
 	BEGIN {
-		maxdepth = 5
+		maxdepth = 6
 	}
+
 	NR == FNR && /^0/ {
 		gsub("[<>:]", "", $2)
 		symbol = $2
@@ -19,7 +20,7 @@ fi
 	}
 
 	NR != FNR {
-		printf "%-98s # %" maxdepth - depth "s%s %s\n", $0, "", text[$1], stack
+		printf "%-98s # %" 2 * (maxdepth - depth) "s%s %s\n", $0, "", text[$1], stack
 	}
 
 	NR != FNR && jalr_delay != 0 {
@@ -40,7 +41,7 @@ fi
 		depth--
 	}
 
-	NR != FNR && $3 == "jr" {
+	NR != FNR && $3 == "jr" && $4 == "ra" {
 		jr_delay = 1
 	}
 
