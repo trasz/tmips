@@ -20,7 +20,10 @@ fi
 	}
 
 	NR != FNR {
-		printf "%-98s # %" 2 * (maxdepth - depth) "s%s %s\n", $0, "", text[$1], stack
+		if (text[$1])
+			printf "%-98s # %" 2 * (maxdepth - depth) "s%s %s\n", $0, "", text[$1], stack
+		else
+			print
 	}
 
 	NR != FNR && jalr_delay != 0 {
