@@ -1,12 +1,12 @@
 #!/bin/sh
 
-if [ $# -ne 1 ]; then
-	echo "usage: $0 binary-path" > /dev/stderr
+if [ $# -lt 1 ]; then
+	echo "usage: $0 binary-path [binary-args ...]" > /dev/stderr
 	exit 1
 fi
 
 rm -f tracemips.fifo
 mkfifo tracemips.fifo
-./tmips -t "$1" > tracemips.fifo 2>&1 &
+./tmips -t $* > tracemips.fifo 2>&1 &
 ./tracesym "$1" tracemips.fifo | less -S
 
