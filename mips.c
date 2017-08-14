@@ -1143,7 +1143,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
+			reg[rt] = be64toh(*((volatile int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LDR:
@@ -1181,7 +1181,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lb");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *((int8_t *)(reg[rs] + immediate));
+			reg[rt] = *((volatile int8_t *)(reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1197,21 +1197,21 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lw");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be32toh(*((int32_t *)(reg[rs] + immediate)));
+			reg[rt] = be32toh(*((volatile int32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LBU:
 			TRACE_OPCODE("lbu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = *((uint8_t *)(reg[rs] + immediate));
+			reg[rt] = *((volatile uint8_t *)(reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_LHU:
 			TRACE_OPCODE("lhu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be16toh(*((uint16_t *)(reg[rs] + immediate)));
+			reg[rt] = be16toh(*((volatile uint16_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1224,20 +1224,20 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("lwu");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be32toh(*((uint32_t *)(reg[rs] + immediate)));
+			reg[rt] = be32toh(*((volatile uint32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SB:
 			TRACE_OPCODE("sb");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int8_t *)(reg[rs] + immediate)) = (int8_t)reg[rt];
+			*((volatile int8_t *)(reg[rs] + immediate)) = (int8_t)reg[rt];
 			break;
 		case OPCODE_SH:
 			TRACE_OPCODE("sh");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((uint16_t *)(reg[rs] + immediate)) = htobe16(reg[rt]);
+			*((volatile uint16_t *)(reg[rs] + immediate)) = htobe16(reg[rt]);
 			break;
 #if 0
 		case OPCODE_SWL:
@@ -1249,14 +1249,14 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sw");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
+			*((volatile int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
 			break;
 		case OPCODE_SDL:
 			TRACE_OPCODE("sdl");
 			TRACE_RT();
 			TRACE_IMM_RS();
 			// XXX: Questionable.
-			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
+			*((volatile int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			break;
 		case OPCODE_SDR:
 			TRACE_OPCODE("sdr");
@@ -1280,7 +1280,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("ll");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be32toh(*((int32_t *)(reg[rs] + immediate)));
+			reg[rt] = be32toh(*((volatile int32_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 #if 0
@@ -1315,14 +1315,14 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("ld");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			reg[rt] = be64toh(*((int64_t *)(reg[rs] + immediate)));
+			reg[rt] = be64toh(*((volatile int64_t *)(reg[rs] + immediate)));
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SC:
 			TRACE_OPCODE("sc");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
+			*((volatile int32_t *)(reg[rs] + immediate)) = htobe32(reg[rt]);
 			reg[rt] = 1;
 			TRACE_RESULT_RT();
 			break;
@@ -1356,7 +1356,7 @@ RUN(int *pc, int argc, char **argv)
 			TRACE_OPCODE("sd");
 			TRACE_RT();
 			TRACE_IMM_RS();
-			*((int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
+			*((volatile int64_t *)(reg[rs] + immediate)) = htobe64(reg[rt]);
 			break;
 		default:
 #ifdef DIE_ON_UNKNOWN
