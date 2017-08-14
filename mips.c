@@ -96,7 +96,7 @@ extern char **environ;
 	} while (0)
 
 static const char *register_names[32] = {
-	"$0",   "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
+	"zero", "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
 	"a4",   "a5",   "a6",   "a7",   "t0",   "t1",   "t2",   "t3",
 	"s0",   "s1",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
 	"t8",   "t9",   "k0",   "k1",   "gp",   "sp",   "s8",   "ra"
@@ -1161,10 +1161,10 @@ RUN(int *pc, int argc, char **argv)
 
 			switch (funct) {
 			case FUNCT_SPECIAL3_RDHWR:
-			TRACE_OPCODE("rdhwr");
-			TRACE_RT();
-			reg[rt] = 0; // XXX
-			TRACE_RESULT_RT();
+				TRACE_OPCODE("rdhwr");
+				TRACE_RT();
+				reg[rt] = 0; // XXX
+				TRACE_RESULT_RT();
 			break;
 			default:
 #ifdef DIE_ON_UNKNOWN
