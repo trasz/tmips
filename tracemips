@@ -7,6 +7,6 @@ fi
 
 rm -f tracemips.fifo
 mkfifo tracemips.fifo
-./tmips -t $* > tracemips.fifo 2>&1 &
+./tmips -x $* > tracemips.fifo 2>&1 &
 ./tracesym "$1" tracemips.fifo | less -S
 

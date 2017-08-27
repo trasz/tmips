@@ -18,7 +18,7 @@
 static void __dead2
 usage(void)
 {
-	fprintf(stderr, "usage: tmips [-t] binary-path [binary-args ...]\n");
+	fprintf(stderr, "usage: tmips [-x] binary-path [binary-args ...]\n");
 	exit(1);
 }
 
@@ -32,13 +32,13 @@ main(int argc, char **argv)
 	void *addr;
 	size_t len, nsections;
 	ssize_t nread;
-	bool tflag = false;
+	bool xflag = false;
 	int ch, fd, error, i;
 
-	while ((ch = getopt(argc, argv, "t")) != -1) {
+	while ((ch = getopt(argc, argv, "x")) != -1) {
 		switch (ch) {
-		case 't':
-			tflag = true;
+		case 'x':
+			xflag = true;
 			break;
 		case '?':
 		default:
@@ -105,7 +105,7 @@ main(int argc, char **argv)
 
 	close(fd);
 
-	if (tflag)
+	if (xflag)
 		return (run_trace((int *)ehdr->e_entry, argc, argv));
 
 	return (run((int *)ehdr->e_entry, argc, argv));
