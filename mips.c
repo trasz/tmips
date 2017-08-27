@@ -163,9 +163,9 @@ fetch_string(int64_t addr)
 
 	str = fetch_string_x(addr);
 
-	if (signal(SIGSEGV, previous_sigsegv) == SIG_ERR)
-		err(1, "signal");
 	if (signal(SIGBUS, previous_sigbus) == SIG_ERR)
+		err(1, "signal");
+	if (signal(SIGSEGV, previous_sigsegv) == SIG_ERR)
 		err(1, "signal");
 
 	return (str);
@@ -352,6 +352,12 @@ fetch_string(int64_t addr)
 #ifndef	MIPS_C
 #define	MIPS_C
 
+// CPU context.
+static int64_t	reg[32];
+static int64_t	hi;
+static int64_t	lo;
+static int	*pc;
+
 static bool	had_args = false;
 static int	linelen;
 
@@ -393,6 +399,35 @@ be64toh_addr(uint64_t *addr)
 
 	*((uint64_t *)addr) = be64toh(*((uint64_t *)addr));
 }
+
+static void
+crash(int meh __unused)
+{
+
+	fprintf(stderr, "\n\ncrashed at %#lx:\n", (uint64_t)pc);
+	fprintf(stderr, "   $0 %-#18lx at %-#18lx v0 %-#18lx v1 %-#18lx\n", reg[0], reg[1], reg[2], reg[3]);
+	fprintf(stderr, "   a0 %-#18lx a1 %-#18lx a2 %-#18lx a3 %-#18lx\n", reg[4], reg[5], reg[6], reg[7]);
+	fprintf(stderr, "   a4 %-#18lx a5 %-#18lx a6 %-#18lx a7 %-#18lx\n", reg[8], reg[9], reg[10], reg[11]);
+	fprintf(stderr, "   t0 %-#18lx t1 %-#18lx t2 %-#18lx t3 %-#18lx\n", reg[12], reg[13], reg[14], reg[15]);
+	fprintf(stderr, "   s0 %-#18lx s1 %-#18lx s2 %-#18lx s3 %-#18lx\n", reg[16], reg[17], reg[18], reg[19]);
+	fprintf(stderr, "   s4 %-#18lx s5 %-#18lx s6 %-#18lx s7 %-#18lx\n", reg[20], reg[21], reg[22], reg[23]);
+	fprintf(stderr, "   t8 %-#18lx t9 %-#18lx k0 %-#18lx k1 %-#18lx\n", reg[24], reg[25], reg[26], reg[27]);
+	fprintf(stderr, "   gp %-#18lx sp %-#18lx s8 %-#18lx ra %-#18lx\n", reg[28], reg[29], reg[30], reg[31]);
+
+	signal(SIGBUS, SIG_DFL);
+	signal(SIGSEGV, SIG_DFL);
+}
+
+static void
+crash_handlers(void)
+{
+
+	if (signal(SIGBUS, crash) == SIG_ERR)
+		err(1, "signal");
+	if (signal(SIGSEGV, crash) == SIG_ERR)
+		err(1, "signal");
+}
+
 #endif /* !MIPS_C */
 
 static inline int64_t
@@ -472,13 +507,9 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 }
 
 static int
-RUN(int *pc, int argc, char **argv)
+RUN(int *pcc, int argc, char **argv)
 {
-	// CPU context.
-	int64_t reg[32], hi = 0, lo = 0;
 	char **ps_strings;
-
-	// Temporaries.
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
@@ -498,12 +529,18 @@ RUN(int *pc, int argc, char **argv)
 
 	// Set up the initial CPU state.
 	memset(reg, 0, sizeof(reg));
+	hi = 0;
+	lo = 0;
+	pc = pcc;
 	reg[0] = 0;
 	reg[4] = (int64_t)ps_strings;
 	reg[25] = (int64_t)pc;
 	reg[29] = (int64_t)ps_strings - 128;
 
 	next_pc = pc + 1;
+
+	// Just in case.
+	crash_handlers();
 
 	// Run!
 	for (;;) {
