@@ -58,7 +58,7 @@ extern char **environ;
 		if (str != NULL) {								\
 			fprintf(stderr, "# %s := %#018lx (\"%s\")",				\
 			     register_name(REG), reg[REG], str);				\
-		} else {									\
+		} else if (REG != 0) {								\
 			fprintf(stderr, "# %s := %#018lx (%ld)",				\
 			     register_name(REG), reg[REG], reg[REG]);				\
 		}										\
