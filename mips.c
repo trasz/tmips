@@ -4,9 +4,12 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <assert.h>
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,7 +21,7 @@ extern char **environ;
 #ifdef TRACE
 #define	RUN run_trace
 #define	DO_SYSCALL do_syscall_trace
-#else
+#else /* !TRACE */
 #undef	RUN
 #define	RUN run
 #undef	DO_SYSCALL
@@ -49,9 +52,16 @@ extern char **environ;
 #define	TRACE_RT()	TRACE_REG(rt)
 
 #define	TRACE_RESULT_REG(REG)	do {								\
+		const char *str;								\
+		str = fetch_string(reg[REG]);							\
 		fprintf(stderr, "%*s", 55 - linelen, "");					\
-		fprintf(stderr, "# %s := %#018lx (%ld)",					\
-		     register_name(REG), reg[REG], reg[REG]);					\
+		if (str != NULL) {								\
+			fprintf(stderr, "# %s := %#018lx (\"%s\")",				\
+			     register_name(REG), reg[REG], str);				\
+		} else {									\
+			fprintf(stderr, "# %s := %#018lx (%ld)",				\
+			     register_name(REG), reg[REG], reg[REG]);				\
+		}										\
 	} while (0)
 
 #define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
@@ -100,6 +110,52 @@ register_name(int i)
 	assert(i >= 0 && (unsigned long)i < nitems(register_names));
 
 	return (register_names[i]);
+}
+
+static jmp_buf fetch_jmp;
+
+static const char *
+fetch_string_x(int64_t addr)
+{
+	static char buf[13]; // NB: Making it wider would break the visual layout.
+	const char *p;
+	char *q;
+
+	q = buf;
+	p = (const char *)addr;
+
+	if (setjmp(fetch_jmp) != 1)
+		for (; isprint(*p) && q < buf + sizeof(buf); p++, q++)
+			*q = *p;
+
+	if (q == buf)
+		return (NULL);
+
+	*q = '\0';
+	return (buf);
+}
+
+static void __dead2
+fetch_string_segv(int meh __unused)
+{
+
+	longjmp(fetch_jmp, 1);
+}
+
+static const char *
+fetch_string(int64_t addr)
+{
+	const char *str;
+	sig_t previous_sig;
+
+	previous_sig = signal(SIGSEGV, fetch_string_segv);
+	if (previous_sig == SIG_ERR)
+		err(1, "signal");
+	str = fetch_string_x(addr);
+	if (signal(SIGSEGV, previous_sig) == SIG_ERR)
+		err(1, "signal");
+
+	return (str);
 }
 
 #else /* !TRACE */
