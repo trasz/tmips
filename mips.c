@@ -441,7 +441,7 @@ RUN(int *pc, int argc, char **argv)
 	reg[0] = 0;
 	reg[4] = (int64_t)ps_strings;
 	reg[25] = (int64_t)pc;
-	reg[29] = (int64_t)ps_strings + i + 2;
+	reg[29] = (int64_t)ps_strings - 128;
 
 	next_pc = pc + 1;
 
