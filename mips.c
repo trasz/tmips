@@ -404,15 +404,18 @@ static void
 crash(int meh __unused)
 {
 
-	fprintf(stderr, "\n\ncrashed at %#lx:\n", (uint64_t)pc);
-	fprintf(stderr, "   $0 %-#18lx at %-#18lx v0 %-#18lx v1 %-#18lx\n", reg[0], reg[1], reg[2], reg[3]);
-	fprintf(stderr, "   a0 %-#18lx a1 %-#18lx a2 %-#18lx a3 %-#18lx\n", reg[4], reg[5], reg[6], reg[7]);
-	fprintf(stderr, "   a4 %-#18lx a5 %-#18lx a6 %-#18lx a7 %-#18lx\n", reg[8], reg[9], reg[10], reg[11]);
-	fprintf(stderr, "   t0 %-#18lx t1 %-#18lx t2 %-#18lx t3 %-#18lx\n", reg[12], reg[13], reg[14], reg[15]);
-	fprintf(stderr, "   s0 %-#18lx s1 %-#18lx s2 %-#18lx s3 %-#18lx\n", reg[16], reg[17], reg[18], reg[19]);
-	fprintf(stderr, "   s4 %-#18lx s5 %-#18lx s6 %-#18lx s7 %-#18lx\n", reg[20], reg[21], reg[22], reg[23]);
-	fprintf(stderr, "   t8 %-#18lx t9 %-#18lx k0 %-#18lx k1 %-#18lx\n", reg[24], reg[25], reg[26], reg[27]);
-	fprintf(stderr, "   gp %-#18lx sp %-#18lx s8 %-#18lx ra %-#18lx\n", reg[28], reg[29], reg[30], reg[31]);
+#ifdef TRACE
+	fprintf(stderr, "\n\n");
+#endif
+	warnx("crashed at pc %#lx", (uint64_t)pc);
+	warnx("$0 = %-#18lx at = %-#18lx v0 = %-#18lx v1 = %-#18lx", reg[0], reg[1], reg[2], reg[3]);
+	warnx("a0 = %-#18lx a1 = %-#18lx a2 = %-#18lx a3 = %-#18lx", reg[4], reg[5], reg[6], reg[7]);
+	warnx("a4 = %-#18lx a5 = %-#18lx a6 = %-#18lx a7 = %-#18lx", reg[8], reg[9], reg[10], reg[11]);
+	warnx("t0 = %-#18lx t1 = %-#18lx t2 = %-#18lx t3 = %-#18lx", reg[12], reg[13], reg[14], reg[15]);
+	warnx("s0 = %-#18lx s1 = %-#18lx s2 = %-#18lx s3 = %-#18lx", reg[16], reg[17], reg[18], reg[19]);
+	warnx("s4 = %-#18lx s5 = %-#18lx s6 = %-#18lx s7 = %-#18lx", reg[20], reg[21], reg[22], reg[23]);
+	warnx("t8 = %-#18lx t9 = %-#18lx k0 = %-#18lx k1 = %-#18lx", reg[24], reg[25], reg[26], reg[27]);
+	warnx("gp = %-#18lx sp = %-#18lx s8 = %-#18lx ra = %-#18lx", reg[28], reg[29], reg[30], reg[31]);
 
 	signal(SIGBUS, SIG_DFL);
 	signal(SIGSEGV, SIG_DFL);
