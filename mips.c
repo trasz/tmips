@@ -117,7 +117,7 @@ static jmp_buf fetch_jmp;
 static const char *
 fetch_string_x(int64_t addr)
 {
-	static char buf[13]; // NB: Making it wider would break the visual layout.
+	static char buf[18]; // NB: Making it wider would break the visual layout.
 	const char *p;
 	char *q;
 

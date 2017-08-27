@@ -21,7 +21,7 @@ fi
 
 	NR != FNR {
 		if (text[$1])
-			printf "%-98s # %" 2 * (maxdepth - depth) "s%s %s\n", $0, "", text[$1], stack
+			printf "%-103s # %" 2 * (maxdepth - depth) "s%s %s\n", $0, "", text[$1], stack
 		else
 			print
 	}
