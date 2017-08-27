@@ -148,6 +148,12 @@ fetch_string(int64_t addr)
 	const char *str;
 	sig_t previous_sigsegv, previous_sigbus;
 
+	/*
+	 * XXX: This shouldn't be needed, right?  But without it, it dies occasionaly.
+	 */
+	if (addr < 9000000)
+		return (NULL);
+
 	previous_sigbus = signal(SIGBUS, fetch_string_sig);
 	if (previous_sigbus == SIG_ERR)
 		err(1, "signal");
