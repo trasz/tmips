@@ -136,7 +136,7 @@ fetch_string_x(int64_t addr)
 }
 
 static void __dead2
-fetch_string_segv(int meh __unused)
+fetch_string_sig(int meh __unused)
 {
 
 	longjmp(fetch_jmp, 1);
@@ -146,13 +146,20 @@ static const char *
 fetch_string(int64_t addr)
 {
 	const char *str;
-	sig_t previous_sig;
+	sig_t previous_sigsegv, previous_sigbus;
 
-	previous_sig = signal(SIGSEGV, fetch_string_segv);
-	if (previous_sig == SIG_ERR)
+	previous_sigbus = signal(SIGBUS, fetch_string_sig);
+	if (previous_sigbus == SIG_ERR)
 		err(1, "signal");
+	previous_sigsegv = signal(SIGSEGV, fetch_string_sig);
+	if (previous_sigsegv == SIG_ERR)
+		err(1, "signal");
+
 	str = fetch_string_x(addr);
-	if (signal(SIGSEGV, previous_sig) == SIG_ERR)
+
+	if (signal(SIGSEGV, previous_sigsegv) == SIG_ERR)
+		err(1, "signal");
+	if (signal(SIGBUS, previous_sigbus) == SIG_ERR)
 		err(1, "signal");
 
 	return (str);
