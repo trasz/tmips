@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -39,10 +40,7 @@ extern char **environ;
 #define	TRACE_REG(REG)	do {									\
 		if (had_args == true)								\
 			linelen += fprintf(stderr, ",");					\
-		if (register_name(REG) != NULL)							\
-			linelen += fprintf(stderr, "%s", register_name(REG));			\
-		else										\
-			linelen += fprintf(stderr, "$%d", REG);					\
+		linelen += fprintf(stderr, "%s", register_name(REG));				\
 		had_args = true;								\
 	} while (0)
 
@@ -52,12 +50,8 @@ extern char **environ;
 
 #define	TRACE_RESULT_REG(REG)	do {								\
 		fprintf(stderr, "%*s", 55 - linelen, "");					\
-		if (register_name(REG) != NULL)							\
-			fprintf(stderr, "# %s := %#018lx (%ld)",				\
-			     register_name(REG), reg[REG], reg[REG]);				\
-		else										\
-			fprintf(stderr, "# $%d := %#018lx (%ld)",				\
-			     REG, reg[REG], reg[REG]);						\
+		fprintf(stderr, "# %s := %#018lx (%ld)",					\
+		     register_name(REG), reg[REG], reg[REG]);					\
 	} while (0)
 
 #define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
@@ -67,10 +61,7 @@ extern char **environ;
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (had_args == true)								\
 			linelen += fprintf(stderr, ",");					\
-		if (register_name(REG) != NULL)							\
-			linelen += fprintf(stderr, "%d(%s)", immediate, register_name(REG));	\
-		else										\
-			linelen += fprintf(stderr, "%d($%d)", immediate, REG);			\
+		linelen += fprintf(stderr, "%d(%s)", immediate, register_name(REG));		\
 		had_args = true;								\
 	} while (0)
 
@@ -106,8 +97,8 @@ static const char *
 register_name(int i)
 {
 
-	if (i < 0 || (unsigned long)i >= nitems(register_names))
-		return (NULL);
+	assert(i >= 0 && (unsigned long)i < nitems(register_names));
+
 	return (register_names[i]);
 }
 
