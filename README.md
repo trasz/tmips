@@ -1,4 +1,4 @@
-Userspace MIPS emulator.  Mostly a toy, but makes easy to interpret instruction traces, like this:
+Userspace MIPS emulator.  Mostly a toy, but makes easy to interpret instruction traces, like this (scroll to the right, there's a stack trace there):
 
 
 ```
