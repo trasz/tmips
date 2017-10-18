@@ -361,15 +361,29 @@ static int	*pc;
 static bool	had_args = false;
 static int	linelen;
 
+// Value taken from FreeBSD running on QEMU; that's what ends up in a0 at the beginning of executieon.
+#define	STACK_ADDRESS	0x7fffffebb0
+
+// This shouldn't really be needed.
+#define	STACK_SIZE	4096 * 1024
+
 static int64_t
 initial_stack_pointer(void)
 {
-	char foo[STACK_PAGES * 4096];
-	int64_t bar;
+	void *p;
 
-	foo[0] = 42;
-	bar = 42;
-	return ((int64_t)&bar);
+	p = (void *)roundup2(STACK_ADDRESS - STACK_SIZE, PAGE_SIZE);
+
+	fprintf(stderr, "stack: mapping %d bytes at %p\n", STACK_SIZE, p);
+	// XXX: This really should use MAP_STACK instead.
+	p = mmap(p, STACK_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_FIXED, -1, 0);
+	if (p == MAP_FAILED)
+		err(1, "cannot map stack");
+
+	// Adjust the pointer to be equal to what gets returned on native MIPS kernel.
+	p = (void *)STACK_ADDRESS;	// Best kind of adjustment.
+
+	return (int64_t)p;
 }
 
 static void
@@ -536,9 +550,9 @@ RUN(int *pcc, int argc, char **argv)
 	lo = 0;
 	pc = pcc;
 	reg[0] = 0;
-	reg[4] = (int64_t)ps_strings;
-	reg[25] = (int64_t)pc;
-	reg[29] = (int64_t)ps_strings - 128;
+	reg[4] = (int64_t)ps_strings;		// a0, should be 0x7fffffebb0
+	reg[25] = (int64_t)pc;			// t9
+	reg[29] = (int64_t)ps_strings - 128;	// sp
 
 	next_pc = pc + 1;
 
