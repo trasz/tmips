@@ -1048,7 +1048,7 @@ RUN(int *pcc, int argc, char **argv)
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
 				next_pc = next_pc + immediate;
-				break;
+				continue;
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
