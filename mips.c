@@ -375,8 +375,7 @@ initial_stack_pointer(void)
 	p = (void *)roundup2(STACK_ADDRESS - STACK_SIZE, PAGE_SIZE);
 
 	fprintf(stderr, "stack: mapping %d bytes at %p\n", STACK_SIZE, p);
-	// XXX: This really should use MAP_STACK instead.
-	p = mmap(p, STACK_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_FIXED, -1, 0);
+	p = mmap(p, STACK_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_STACK | MAP_FIXED, -1, 0);
 	if (p == MAP_FAILED)
 		err(1, "cannot map stack");
 
