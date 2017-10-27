@@ -364,24 +364,30 @@ static int	linelen;
 // Values taken from FreeBSD running on QEMU.
 #define	STACK_TOP	0x7ffffff000
 #define	STACK_BOTTOM	0x7ffffdf000
+
 #define	PS_STRINGS	0x7fffffebb0
 
-static int64_t
-initial_stack_pointer(void)
+static void
+map_stack(void)
 {
 	void *p;
-
-	p = (void *)STACK_BOTTOM;
 
 	fprintf(stderr, "stack top at %#lx, bottom at %#lx\n", STACK_TOP, STACK_BOTTOM);
 	p = mmap((void *)STACK_BOTTOM, STACK_TOP - STACK_BOTTOM, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_STACK | MAP_FIXED, -1, 0);
 	if (p == MAP_FAILED)
 		err(1, "cannot map stack");
+}
 
-	// Adjust the pointer to be equal to what gets returned on native MIPS kernel.
-	p = (void *)PS_STRINGS;	// Best kind of adjustment.
+static int64_t
+push_string(int64_t sp, const char *str)
+{
+	size_t len;
 
-	return (int64_t)p;
+	len = strlen(str) + 1;
+	sp -= len;
+	memcpy((void *)sp, str, len);
+
+	return (sp);
 }
 
 static void
@@ -525,21 +531,32 @@ static int
 RUN(int *pcc, int argc, char **argv)
 {
 	char **ps_strings;
+	uint64_t sp;
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
 	int i, j, *next_pc;
 
+	map_stack();
+
 	// Set up the strings.
+	sp = STACK_TOP;
 	i = 0;
-	ps_strings = (char **)initial_stack_pointer();
+
+	// Adjust the pointer to be equal to what gets returned on native MIPS kernel.
+	ps_strings = (void *)PS_STRINGS;
+
 	fprintf(stderr, "ps_strings at %p, argc %d\n", (void *)ps_strings, argc);
 	ps_strings[i++] = (char *)htobe64((uint64_t)argc);
-	for (j = 0; j < argc; j++)
-		ps_strings[i++] = (char *)htobe64((uint64_t)argv[j]);
+	for (j = 0; j < argc; j++) {
+		sp = push_string(sp, argv[j]);
+		ps_strings[i++] = (char *)htobe64((uint64_t)sp);
+	}
 	ps_strings[i++] = 0;
-	for (j = 0; environ[j] != '\0'; j++)
-		ps_strings[i++] = (char *)htobe64((uint64_t)environ[j]);
+	for (j = 0; environ[j] != '\0'; j++) {
+		sp = push_string(sp, environ[j]);
+		ps_strings[i++] = (char *)htobe64(sp);
+	}
 	ps_strings[i++] = 0;
 
 	// Set up the initial CPU state.
@@ -550,7 +567,7 @@ RUN(int *pcc, int argc, char **argv)
 	reg[0] = 0;
 	reg[4] = (int64_t)ps_strings;		// a0, should be 0x7fffffebb0
 	reg[25] = (int64_t)pc;			// t9
-	reg[29] = (int64_t)ps_strings - 128;	// sp
+	reg[29] = (int64_t)0x7fffffebb0;	// sp, should be 0x7fffffeb70
 
 	next_pc = pc + 1;
 
