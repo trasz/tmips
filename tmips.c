@@ -29,7 +29,7 @@ main(int argc, char **argv)
 	Elf64_Ehdr *ehdr;
 	Elf64_Phdr *phdr;
 	const char *path;
-	void *addr;
+	void *addr, *rv;
 	size_t len, nsections;
 	ssize_t nread;
 	bool xflag = false;
@@ -93,9 +93,9 @@ main(int argc, char **argv)
 		 * The fact that p_memsz is often different from p_filesz
 		 * makes mmap(2) rather non-trivial.
 		 */
-		addr = mmap(addr, len, PROT_READ | PROT_WRITE,
+		rv = mmap(addr, len, PROT_READ | PROT_WRITE,
 		    MAP_ANON | MAP_FIXED | MAP_EXCL | MAP_PRIVATE, -1, 0);
-		if (addr == MAP_FAILED)
+		if (rv == MAP_FAILED)
 			err(1, "cannot map %zd bytes at %p", len, addr);
 
 		nread = pread(fd, (void *)phdr[i].p_vaddr, phdr[i].p_filesz, (off_t)phdr[i].p_offset);
