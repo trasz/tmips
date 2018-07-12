@@ -52,10 +52,6 @@ extern char **environ;
 		had_args = true;								\
 	} while (0)
 
-#define	TRACE_RD()	TRACE_REG(rd)
-#define	TRACE_RS()	TRACE_REG(rs)
-#define	TRACE_RT()	TRACE_REG(rt)
-
 #define	TRACE_RESULT_REG(REG)	do {								\
 		const char *str;								\
 		str = fetch_string(reg[REG]);							\
@@ -69,10 +65,6 @@ extern char **environ;
 		}										\
 	} while (0)
 
-#define	TRACE_RESULT_RD()	TRACE_RESULT_REG(rd)
-#define	TRACE_RESULT_RS()	TRACE_RESULT_REG(rs)
-#define	TRACE_RESULT_RT()	TRACE_RESULT_REG(rt)
-
 #define	TRACE_IMM_REG(REG)	do {								\
 		if (had_args == true)								\
 			linelen += fprintf(stderr, ",");					\
@@ -80,19 +72,10 @@ extern char **environ;
 		had_args = true;								\
 	} while (0)
 
-#define	TRACE_IMM_RS()	TRACE_IMM_REG(rs)
-
 #define	TRACE_IMM(IMM)	do {									\
 		if (had_args == true)								\
 			linelen += fprintf(stderr, ",");					\
 		linelen += fprintf(stderr, "%d", IMM);						\
-		had_args = true;								\
-	} while (0)
-
-#define	TRACE_SA()	do {									\
-		if (had_args == true)								\
-			linelen += fprintf(stderr, ",");					\
-		linelen += fprintf(stderr, "%d", sa);						\
 		had_args = true;								\
 	} while (0)
 
@@ -103,9 +86,9 @@ extern char **environ;
 
 static const char *register_names[32] = {
 	"zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t2",   "t3",
-	"fp",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
+	"s0",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
 	"a6",   "a7",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
-	"s8",   "s9",   "s10",  "s11",   "t3",  "t4",   "t5",   "t6"
+	"s8",   "s9",   "s10",  "s11",  "t3",   "t4",   "t5",   "t6"
 };
 
 static const char *
@@ -179,24 +162,10 @@ fetch_string(int64_t addr)
 #else /* !TRACE */
 #undef	TRACE_OPCODE
 #define TRACE_OPCODE(X)
-#undef	TRACE_RD
-#define TRACE_RD()
-#undef	TRACE_RS
-#define TRACE_RS()
-#undef	TRACE_RT
-#define TRACE_RT()
-#undef	TRACE_SA
-#define TRACE_SA()
 #undef	TRACE_RESULT_REG
 #define TRACE_RESULT_REG(X)
-#undef	TRACE_RESULT_RT
-#define TRACE_RESULT_RT()
-#undef	TRACE_RESULT_RD
-#define TRACE_RESULT_RD()
 #undef	TRACE_IMM_REG
 #define TRACE_IMM_REG(X)
-#undef	TRACE_IMM_RS
-#define TRACE_IMM_RS()
 #undef	TRACE_IMM
 #define TRACE_IMM(X)
 #undef	TRACE_JUMP
@@ -204,6 +173,130 @@ fetch_string(int64_t addr)
 #undef	TRACE_STR
 #define TRACE_STR(X)
 #endif /* !TRACE */
+
+/*
+ * RV32I Base Instruction Set
+ */
+#define	OP_LUI		0x37
+#define	OP_AUIPC	0x17
+#define	OP_JAL		0x6f
+#define	OP_JALR
+#define	OP_BEQ
+#define	OP_BNE
+#define	OP_BLT
+#define	OP_BGE
+#define	OP_BLTU
+#define	OP_BGEU
+#define	OP_LB
+#define	OP_LH
+#define	OP_LW
+#define	OP_LBU
+#define	OP_LHU
+#define	OP_SB
+#define	OP_SH
+#define	OP_SW
+#define	OP_ADDI		0x13
+#define	OP_SLTI
+#define	OP_SLTIU
+#define	OP_XORI
+#define	OP_ORI
+#define	OP_ANDI
+#define	OP_SLLI		0x1013
+#define	OP_SLRI
+#define	OP_SRAI
+#define	OP_ADD		0x33
+#define	OP_SUB
+#define	OP_SLL
+#define	OP_SLT
+#define	OP_SLTU
+#define	OP_XOR
+#define	OP_SRL
+#define	OP_SRA
+#define	OP_OR
+#define	OP_AND
+#define	OP_FENCE
+#define	OP_FENCEI
+#define	OP_ECALL
+#define	OP_EBREAK
+#define	OP_CSRRW
+#define	OP_CSRRS
+#define	OP_CSRRC
+#define	OP_CSRRWI
+#define	OP_CSRRSI
+#define	OP_CSRRCI
+
+/*
+ * RV64I Base Instruction Set
+ */
+#define	OP_LWU
+#define	OP_LD
+#define	OP_SD
+/*
+ * XXX: Hm, SLLI, SRLI, and SRAI are duplicated here?
+ */
+#define	OP_ADDIW
+#define	OP_SLLIW
+#define	OP_SRLIW
+#define	OP_SRAIW
+#define	OP_ADDW
+#define	OP_SUBW
+#define	OP_SLLW
+#define	OP_SRLW
+#define	OP_SRAW
+
+/*
+ * RV32M Standard Extension
+ */
+#define	OP_MUL
+#define	OP_MULH
+#define	OP_MULHSU
+#define	OP_MULHU
+#define	OP_DIV
+#define	OP_DIVU
+#define	OP_REM
+#define	OP_REMU
+
+/*
+ * RV64M Standard Extension
+ */
+#define	OP_MULW
+#define	OP_DIVW
+#define	OP_DIVUW
+#define	OP_REMW
+#define	OP_REMUW
+
+/*
+ * RV64C
+ */
+#define	OP_C0		0x00
+#define		OP_CADDI4SPN	(OP_C0)
+#define		OP_CFLD		(OP_C0 | (0x1 << 13))
+#define		OP_CLW		(OP_C0 | (0x2 << 13))
+#define		OP_CLD		(OP_C0 | (0x3 << 13))
+				/* (Reserved.) */
+#define		OP_CFSD		(OP_C0 | (0x5 << 13))
+#define		OP_CSW		(OP_C0 | (0x6 << 13))
+#define		OP_CSD		(OP_C0 | (0x7 << 13))
+
+#define	OP_C1		0x01
+#define		OP_CNOP_ET_AL	(OP_C1)
+#define		OP_CADDIW	(OP_C1 | (0x1 << 13))
+#define		OP_CLI		(OP_C1 | (0x2 << 13))
+#define		OP_CADDI16SP_ET_AL	(OP_C1 | (0x3 << 13))
+#define		OP_CSRLI_ET_AL	(OP_C1 | (0x4 << 13))
+#define		OP_CJ		(OP_C1 | (0x5 << 13))
+#define		OP_CBEQZ	(OP_C1 | (0x6 << 13))
+#define		OP_CBNEZ	(OP_C1 | (0x7 << 13))
+
+#define	OP_C2		0x02
+#define		OP_CSLLI_ET_AL	(OP_C2)
+#define		OP_CFLDSP	(OP_C2 | (0x1 << 13))
+#define		OP_CLWSP	(OP_C2 | (0x2 << 13))
+#define		OP_CLDSP	(OP_C2 | (0x3 << 13))
+#define		OP_CJR_ET_AL	(OP_C2 | (0x4 << 13))
+#define		OP_CFSDSP	(OP_C2 | (0x5 << 13))
+#define		OP_CSWSP	(OP_C2 | (0x6 << 13))
+#define		OP_CSDSP	(OP_C2 | (0x7 << 13))
 
 #ifndef	MIPS_C
 #define	MIPS_C
@@ -282,14 +375,14 @@ crash(int meh __unused)
 	fprintf(stderr, "\n\n");
 #endif
 	warnx("crashed at pc %#lx", (uint64_t)pc);
-	warnx("$0 = %-#18lx at = %-#18lx v0 = %-#18lx v1 = %-#18lx", reg[0], reg[1], reg[2], reg[3]);
-	warnx("a0 = %-#18lx a1 = %-#18lx a2 = %-#18lx a3 = %-#18lx", reg[4], reg[5], reg[6], reg[7]);
-	warnx("a4 = %-#18lx a5 = %-#18lx a6 = %-#18lx a7 = %-#18lx", reg[8], reg[9], reg[10], reg[11]);
-	warnx("t0 = %-#18lx t1 = %-#18lx t2 = %-#18lx t3 = %-#18lx", reg[12], reg[13], reg[14], reg[15]);
-	warnx("s0 = %-#18lx s1 = %-#18lx s2 = %-#18lx s3 = %-#18lx", reg[16], reg[17], reg[18], reg[19]);
+	warnx("$0 = %-#18lx ra = %-#18lx sp = %-#18lx gp = %-#18lx", reg[0], reg[1], reg[2], reg[3]);
+	warnx("tp = %-#18lx t0 = %-#18lx t2 = %-#18lx t3 = %-#18lx", reg[4], reg[5], reg[6], reg[7]);
+	warnx("s0 = %-#18lx s1 = %-#18lx a0 = %-#18lx a1 = %-#18lx", reg[8], reg[9], reg[10], reg[11]);
+	warnx("a2 = %-#18lx a3 = %-#18lx a4 = %-#18lx a5 = %-#18lx", reg[12], reg[13], reg[14], reg[15]);
+	warnx("a6 = %-#18lx a7 = %-#18lx s2 = %-#18lx s3 = %-#18lx", reg[16], reg[17], reg[18], reg[19]);
 	warnx("s4 = %-#18lx s5 = %-#18lx s6 = %-#18lx s7 = %-#18lx", reg[20], reg[21], reg[22], reg[23]);
-	warnx("t8 = %-#18lx t9 = %-#18lx k0 = %-#18lx k1 = %-#18lx", reg[24], reg[25], reg[26], reg[27]);
-	warnx("gp = %-#18lx sp = %-#18lx s8 = %-#18lx ra = %-#18lx", reg[28], reg[29], reg[30], reg[31]);
+	warnx("s8 = %-#18lx s9 = %-#18lx s10= %-#18lx s11= %-#18lx", reg[24], reg[25], reg[26], reg[27]);
+	warnx("t3 = %-#18lx t4 = %-#18lx t5 = %-#18lx t6 = %-#18lx", reg[28], reg[29], reg[30], reg[31]);
 
 	signal(SIGBUS, SIG_DFL);
 	signal(SIGSEGV, SIG_DFL);
@@ -393,42 +486,7 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 	return (rv);
 }
 
-#define	OP_AUIPC	0x17
-#define	OP_JAL		0x6f
-
-#define	OP_ADDI		0x13
-#define	OP_SLLI		0x1013
-#define	OP_ADD		0x33
-
-#define	OP_C0		0x00
-#define		OP_CADDI4SPN	(OP_C0)
-#define		OP_CFLD		(OP_C0 | (0x1 << 13))
-#define		OP_CLW		(OP_C0 | (0x2 << 13))
-#define		OP_CLD		(OP_C0 | (0x3 << 13))
-				/* (Reserved.) */
-#define		OP_CFSD		(OP_C0 | (0x5 << 13))
-#define		OP_CSW		(OP_C0 | (0x6 << 13))
-#define		OP_CSD		(OP_C0 | (0x7 << 13))
-
-#define	OP_C1		0x01
-#define		OP_CNOP_ET_AL	(OP_C1)
-#define		OP_CADDIW	(OP_C1 | (0x1 << 13)
-#define		OP_CLI		(OP_C1 | (0x2 << 13)
-#define		OP_CADDI16SP_ET_AL	(OP_C1 | (0x3 << 13)
-#define		OP_CSRLI_ET_AL	(OP_C1 | (0x4 << 13)
-#define		OP_CJ		(OP_C1 | (0x5 << 13)
-#define		OP_CBEQZ	(OP_C1 | (0x6 << 13)
-#define		OP_CBNEZ	(OP_C1 | (0x7 << 13)
-
-#define	OP_C2		0x02
-#define		OP_CSLLI_ET_AL	(OP_C2)
-#define		OP_CFLDSP	(OP_C2 | (0x1 << 13))
-#define		OP_CLWSP	(OP_C2 | (0x2 << 13))
-#define		OP_CLDSP		(OP_C2 | (0x3 << 13))
-#define		OP_CJR_ET_AL	(OP_C2 | (0x4 << 13))
-#define		OP_CFSDSP	(OP_C2 | (0x5 << 13))
-#define		OP_CSWSP	(OP_C2 | (0x6 << 13))
-#define		OP_CSDSP	(OP_C2 | (0x7 << 13))
+#define	PICK(VAR, NBITS, SHIFT)	(VAR & (~0U >> (32 - NBITS)) << SHIFT) >> SHIFT
 
 static int
 RUN(int *pcc, int argc, char **argv)
@@ -482,10 +540,10 @@ RUN(int *pcc, int argc, char **argv)
 
 		if ((instruction & 0x3) == 0x3) {
 			opcode = instruction & 0x383f /* 0b11100000111111 */;
-			rd = (instruction & (0x1f << 7)) >> 7;
-			rs1 = (instruction & (0x1f << 15)) >> 15;
-			rs2 = (instruction & (0x1f << 20)) >> 20;
-			imm_11_0 = (instruction & (0xfff << 20)) >> 20;
+			rd = PICK(instruction, 5, 7);
+			rs1 = PICK(instruction, 5, 15);
+			rs2 = PICK(instruction, 5, 20);
+			imm_11_0 = PICK(instruction, 12, 20);
 
 			switch (opcode) {
 			case OP_ADDI:
@@ -510,6 +568,11 @@ RUN(int *pcc, int argc, char **argv)
 			default:
 				opcode = instruction & 0x7f /* 0b1111111 */;
 				switch (opcode) {
+				case OP_LUI:
+					TRACE_OPCODE("lui");
+					TRACE_REG(rd);
+					// XXX: Offset
+					break;
 				case OP_AUIPC:
 					TRACE_OPCODE("auipc");
 					TRACE_REG(rd);
@@ -533,15 +596,15 @@ RUN(int *pcc, int argc, char **argv)
 
 			pc += 4;
 		} else {
-			int rd_prime, rs1_prime;
+			int rd_prime, rs1_prime, rs1_prime_rd_prime, rs2_prime;
 
 			instruction &= 0xffff;
 
 			opcode = instruction & 0xe003 /* 0b1110000000000011 */;
-			rd_rs1 = (instruction & (0x1f << 7)) >> 7;
-			rs2 = (instruction & (0x1f << 2)) >> 2;
-			rd_prime = unprime((instruction & (0x7 << 2)) >> 2);
-			rs1_prime = unprime((instruction & (0x7 << 7)) >> 7);
+			rd_rs1 = PICK(instruction, 5, 7);
+			rs2 = PICK(instruction, 5, 2);
+			rs2_prime = rd_prime = unprime(PICK(instruction, 3, 2));
+			rs1_prime_rd_prime = rs1_prime = unprime(PICK(instruction, 3, 7));
 
 			switch (opcode) {
 			case OP_CLD:
@@ -560,8 +623,19 @@ RUN(int *pcc, int argc, char **argv)
 					// XXX: Offset
 					break;
 				}
+			case OP_CSRLI_ET_AL:
+				switch (PICK(instruction, 2, 10)) {
+				case 0x3:
+					switch (PICK(instruction, 2, 5)) {
+					case 0x0:
+						TRACE_OPCODE("c.sub");
+						TRACE_REG(rs1_prime_rd_prime);
+						TRACE_REG(rs2_prime);
+						break;
+					}
+				}
 			case OP_CJR_ET_AL:
-				if ((instruction & (1 << 12)) == 0) {
+				if (PICK(instruction, 1, 12) == 0) {
 					if (rs2 == 0) {
 						TRACE_OPCODE("c.jr");
 						break;
@@ -585,6 +659,11 @@ RUN(int *pcc, int argc, char **argv)
 						break;
 					}
 				}
+			case OP_CSDSP:
+				TRACE_OPCODE("c.sdsp");
+				TRACE_REG(rs2);
+				// XXX: Offset, sp
+				break;
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
