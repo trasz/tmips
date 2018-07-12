@@ -1,4 +1,5 @@
-CFLAGS+=	-Wall -Weverything -Wextra -Wno-sign-conversion -Wno-bad-function-cast -pedantic -O3 -ggdb -lelf
+CFLAGS+=	-Wall -Wextra -Wno-sign-conversion -Wno-bad-function-cast -pedantic -O3 -ggdb -lelf -L/usr/lib
+CC=		gcc6
 
 default: all
 
