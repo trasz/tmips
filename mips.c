@@ -16,6 +16,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "opcodes.h"
+
 extern char **environ;
 
 #ifdef TRACE
@@ -180,90 +182,10 @@ fetch_string(int64_t addr)
 #define	OP_LUI		0x37
 #define	OP_AUIPC	0x17
 #define	OP_JAL		0x6f
-#define	OP_JALR
-#define	OP_BEQ
-#define	OP_BNE
-#define	OP_BLT
-#define	OP_BGE
-#define	OP_BLTU
-#define	OP_BGEU
-#define	OP_LB
-#define	OP_LH
-#define	OP_LW
-#define	OP_LBU
-#define	OP_LHU
-#define	OP_SB
-#define	OP_SH
-#define	OP_SW
-#define	OP_ADDI		0x13
-#define	OP_SLTI
-#define	OP_SLTIU
-#define	OP_XORI
-#define	OP_ORI
-#define	OP_ANDI
-#define	OP_SLLI		0x1013
-#define	OP_SLRI
-#define	OP_SRAI
-#define	OP_ADD		0x33
-#define	OP_SUB
-#define	OP_SLL
-#define	OP_SLT
-#define	OP_SLTU
-#define	OP_XOR
-#define	OP_SRL
-#define	OP_SRA
-#define	OP_OR
-#define	OP_AND
-#define	OP_FENCE
-#define	OP_FENCEI
-#define	OP_ECALL
-#define	OP_EBREAK
-#define	OP_CSRRW
-#define	OP_CSRRS
-#define	OP_CSRRC
-#define	OP_CSRRWI
-#define	OP_CSRRSI
-#define	OP_CSRRCI
 
 /*
- * RV64I Base Instruction Set
+ * Most opcodes are defined in "opcodes.h".
  */
-#define	OP_LWU
-#define	OP_LD
-#define	OP_SD
-/*
- * XXX: Hm, SLLI, SRLI, and SRAI are duplicated here?
- */
-#define	OP_ADDIW
-#define	OP_SLLIW
-#define	OP_SRLIW
-#define	OP_SRAIW
-#define	OP_ADDW
-#define	OP_SUBW
-#define	OP_SLLW
-#define	OP_SRLW
-#define	OP_SRAW
-
-/*
- * RV32M Standard Extension
- */
-#define	OP_MUL
-#define	OP_MULH
-#define	OP_MULHSU
-#define	OP_MULHU
-#define	OP_DIV
-#define	OP_DIVU
-#define	OP_REM
-#define	OP_REMU
-
-/*
- * RV64M Standard Extension
- */
-#define	OP_MULW
-#define	OP_DIVW
-#define	OP_DIVUW
-#define	OP_REMW
-#define	OP_REMUW
 
 /*
  * RV64C

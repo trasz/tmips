@@ -5,9 +5,12 @@ default: all
 
 all: tmips
 
-tmips: Makefile tmips.c mips.c
+opcodes.h: opcodes
+	./opcodes.py opcodes opcodes.h
+
+tmips: Makefile tmips.c mips.c opcodes.h
 	$(CC) $(CFLAGS) -o tmips tmips.c
 
 clean:
-	rm -f tmips
+	rm -f tmips opcodes.h
 
