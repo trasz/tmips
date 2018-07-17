@@ -39,7 +39,7 @@ extern char **environ;
 			    (unsigned long long)pc, instruction, STR);			\
 		} else {								\
 			linelen = fprintf(stderr, "\n%12llx:   %04x            %-7s ",	\
-			    (unsigned long long)pc, instruction, STR);			\
+			    (unsigned long long)pc, instruction & 0xffff, STR);		\
 		}									\
 		had_args = false;							\
 	} while (0)
@@ -74,7 +74,7 @@ extern char **environ;
 #define	TRACE_IMM(IMM)	do {								\
 		if (had_args == true)							\
 			linelen += fprintf(stderr, ",");				\
-		linelen += fprintf(stderr, "%d", IMM);					\
+		linelen += fprintf(stderr, "%#x", IMM);					\
 		had_args = true;							\
 	} while (0)
 
@@ -84,7 +84,7 @@ extern char **environ;
 	} while (0)
 
 static const char *register_names[32] = {
-	"zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t2",   "t3",
+	"zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t1",   "t2",
 	"s0",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
 	"a6",   "a7",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
 	"s8",   "s9",   "s10",  "s11",  "t3",   "t4",   "t5",   "t6"
@@ -161,6 +161,8 @@ fetch_string(int64_t addr)
 #else /* !TRACE */
 #undef	TRACE_OPCODE
 #define TRACE_OPCODE(X)
+#undef	TRACE_REG
+#define TRACE_REG(X)
 #undef	TRACE_RESULT_REG
 #define TRACE_RESULT_REG(X)
 #undef	TRACE_IMM_REG
@@ -261,9 +263,9 @@ crash(int meh __unused)
 #ifdef TRACE
 	fprintf(stderr, "\n\n");
 #endif
-	warnx("crashed at pc %#lx", (uint64_t)pc);
+	warnx("crashed at pc %p", pc);
 	warnx("$0 = %-#18lx ra = %-#18lx sp = %-#18lx gp = %-#18lx", x[0], x[1], x[2], x[3]);
-	warnx("tp = %-#18lx t0 = %-#18lx t2 = %-#18lx t3 = %-#18lx", x[4], x[5], x[6], x[7]);
+	warnx("tp = %-#18lx t0 = %-#18lx t1 = %-#18lx t2 = %-#18lx", x[4], x[5], x[6], x[7]);
 	warnx("s0 = %-#18lx s1 = %-#18lx a0 = %-#18lx a1 = %-#18lx", x[8], x[9], x[10], x[11]);
 	warnx("a2 = %-#18lx a3 = %-#18lx a4 = %-#18lx a5 = %-#18lx", x[12], x[13], x[14], x[15]);
 	warnx("a6 = %-#18lx a7 = %-#18lx s2 = %-#18lx s3 = %-#18lx", x[16], x[17], x[18], x[19]);
@@ -316,13 +318,13 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 	return (rv);
 }
 
-#define	PICK(VAR, NBITS, SHIFT)	(VAR & (~0U >> (32 - NBITS)) << SHIFT) >> SHIFT
+#define	PICK(VAR, NBITS, SHIFT)	((VAR & (~0U >> (32 - NBITS)) << SHIFT) >> SHIFT)
 
 static int
 RUN(int *pcc, int argc, char **argv)
 {
 	char **ps_strings;
-	int instruction, imm_11_0, opcode, rd, rs1, rd_rs1, rs2;
+	int instruction, opcode;
 	uint64_t sp;
 	int i, j;
 
@@ -365,24 +367,69 @@ RUN(int *pcc, int argc, char **argv)
 		instruction = *(uint32_t *)pc;
 
 		if ((instruction & 0x3) == 0x3) {
-			opcode = instruction & 0x383f /* 0b11100000111111 */;
+			int rd, rs1, rs2, imm_i, imm_s, imm_b, imm_u, imm_j;
+
+			opcode = instruction & 0x707f /* 0b111000001111111 */;
 			rd = PICK(instruction, 5, 7);
 			rs1 = PICK(instruction, 5, 15);
 			rs2 = PICK(instruction, 5, 20);
-			imm_11_0 = PICK(instruction, 12, 20);
+			imm_i = PICK(instruction, 12, 20);
+			imm_s = PICK(instruction, 4, 7) | PICK(instruction, 12, 25) << 5;
+			imm_b = PICK(instruction, 1, 31) << 12 | PICK(instruction, 1, 7) << 11 | PICK(instruction, 6, 25) << 5 | PICK(instruction, 4, 8) << 1;
+			imm_u = PICK(instruction, 20, 12);
+			imm_j = PICK(instruction, 1, 31) << 20 | PICK(instruction, 8, 12) << 12 | PICK(instruction, 1, 20) << 11 | PICK(instruction, 10, 21 /* XXX */) << 1; /* srsly */
 
+			/*
+			 * Opcodes from "opcodes.h" go here.
+			 */
 			switch (opcode) {
+			case OP_BEQ:
+				TRACE_OPCODE("beq");
+				TRACE_REG(rs1);
+				TRACE_REG(rs2);
+				TRACE_IMM(imm_b);
+				break;
+			case OP_BNE:
+				TRACE_OPCODE("bne");
+				TRACE_REG(rs1);
+				TRACE_REG(rs2);
+				TRACE_IMM(imm_b);
+				break;
+			case OP_BGE:
+				TRACE_OPCODE("bge");
+				TRACE_REG(rs1);
+				TRACE_REG(rs2);
+				TRACE_IMM(imm_b);
+				break;
+			case OP_BLTU:
+				TRACE_OPCODE("bltu");
+				TRACE_REG(rs1);
+				TRACE_REG(rs2);
+				TRACE_IMM(imm_b);
+				break;
+			case OP_BGEU:
+				TRACE_OPCODE("bgeu");
+				TRACE_REG(rs1);
+				TRACE_REG(rs2);
+				TRACE_IMM(imm_b);
+				break;
 			case OP_ADDI:
 				TRACE_OPCODE("addi");
 				TRACE_REG(rd);
 				TRACE_REG(rs1);
-				TRACE_IMM(imm_11_0);
+				TRACE_IMM(imm_i);
 				break;
 			case OP_SLLI:
 				TRACE_OPCODE("slli");
 				TRACE_REG(rd);
 				TRACE_REG(rs1);
-				TRACE_IMM(imm_11_0);
+				TRACE_IMM(imm_i);
+				break;
+			case OP_SRAI:
+				TRACE_OPCODE("srai");
+				TRACE_REG(rd);
+				TRACE_REG(rs1);
+				TRACE_IMM(imm_i);
 				break;
 			case OP_ADD:
 				TRACE_OPCODE("add");
@@ -390,19 +437,40 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_REG(rs1);
 				TRACE_REG(rs2);
 				break;
-
+			case OP_LD:
+				TRACE_OPCODE("ld");
+				TRACE_REG(rd);
+				break;
+			case OP_LBU:
+				TRACE_OPCODE("lbu");
+				TRACE_REG(rd);
+				break;
+			case OP_SB:
+				TRACE_OPCODE("sb");
+				TRACE_REG(rs2);
+				TRACE_REG(rs1);
+				break;
+			case OP_SD:
+				TRACE_OPCODE("sd");
+				TRACE_REG(rs2);
+				TRACE_REG(rs1);
+				break;
 			default:
 				opcode = instruction & 0x7f /* 0b1111111 */;
 				switch (opcode) {
+
+				/*
+				 * Opcodes with undefined 14..12 go here.
+				 */
 				case OP_LUI:
 					TRACE_OPCODE("lui");
 					TRACE_REG(rd);
-					// XXX: Offset
+					TRACE_IMM(imm_u);
 					break;
 				case OP_AUIPC:
 					TRACE_OPCODE("auipc");
 					TRACE_REG(rd);
-					// XXX: Offset
+					TRACE_IMM(imm_u);
 					break;
 				case OP_JAL:
 					TRACE_OPCODE("jal");
@@ -410,16 +478,15 @@ RUN(int *pcc, int argc, char **argv)
 					// XXX: Offset
 					break;
 				default:
-					fprintf(stderr, "\n");
-					errx(1, "unknown instruction %#x (opcode %#x) at address %p", instruction, opcode, (void *)pc);
+					crash(42);
+					errx(1, "unknown instruction %#010x (14..12=%d 6..2=%#x 1..0=%d)",
+					    instruction, PICK(instruction, 3, 12), PICK(instruction, 6, 2), PICK(instruction, 2, 0));
 				}
 			}
 
 			pc += 4;
 		} else {
-			int rd_prime, rs1_prime, rs1_prime_rd_prime, rs2_prime;
-
-			instruction &= 0xffff;
+			int rd_prime, rd_rs1, rs1_prime, rs1_prime_rd_prime, rs2, rs2_prime;
 
 			opcode = instruction & 0xe003 /* 0b1110000000000011 */;
 			rd_rs1 = PICK(instruction, 5, 7);
@@ -427,13 +494,27 @@ RUN(int *pcc, int argc, char **argv)
 			rs2_prime = rd_prime = unprime(PICK(instruction, 3, 2));
 			rs1_prime_rd_prime = rs1_prime = unprime(PICK(instruction, 3, 7));
 
+			/*
+			 * RV64C opcodes go here.
+			 */
 			switch (opcode) {
+			/*
+			 * Quadrant 0.
+			 */
+			case OP_CADDI4SPN:
+				TRACE_OPCODE("c.addi4spn");
+				TRACE_REG(rd_prime);
+				break;
 			case OP_CLD:
 				TRACE_OPCODE("c.ld");
 				TRACE_REG(rd_prime);
 				TRACE_REG(rs1_prime);
 				// XXX: Offset
 				break;
+
+			/*
+			 * Quadrant 1.
+			 */
 			case OP_CNOP_ET_AL:
 				if (rd_rs1 == 0) {
 					TRACE_OPCODE("c.nop");
@@ -455,6 +536,37 @@ RUN(int *pcc, int argc, char **argv)
 						break;
 					}
 				}
+#if 1
+			case OP_CLI:
+				TRACE_OPCODE("c.li");
+				TRACE_REG(rd_rs1);
+				// XXX: Offset
+				break;
+#endif
+			case OP_CADDI16SP_ET_AL:
+				if (rd_rs1 == 2) {
+					TRACE_OPCODE("c.addi16sp");
+					TRACE_REG(2); // Implied.
+					break;
+				} else {
+					// c.lui
+				}
+			case OP_CJ:
+				TRACE_OPCODE("c.j");
+				break;
+			case OP_CBEQZ:
+				TRACE_OPCODE("c.beqz");
+				TRACE_REG(rs1_prime_rd_prime);
+				// XXX: Offset
+				break;
+			case OP_CBNEZ:
+				TRACE_OPCODE("c.bnez");
+				TRACE_REG(rs1_prime_rd_prime);
+				// XXX: Offset
+				break;
+			/*
+			 * Quadrant 2.
+			 */
 			case OP_CJR_ET_AL:
 				if (PICK(instruction, 1, 12) == 0) {
 					if (rs2 == 0) {
@@ -473,21 +585,30 @@ RUN(int *pcc, int argc, char **argv)
 							break;
 						} else {
 							TRACE_OPCODE("c.jalr");
+							TRACE_REG(rd_rs1);
 							break;
 						}
 					} else {
 						TRACE_OPCODE("c.add");
+						TRACE_REG(rd_rs1);
+						TRACE_REG(rs2);
 						break;
 					}
 				}
+			case OP_CLDSP:
+				TRACE_OPCODE("c.ldsp");
+				TRACE_REG(rd_rs1);
+				// XXX: Offset, sp
+				break;
 			case OP_CSDSP:
 				TRACE_OPCODE("c.sdsp");
 				TRACE_REG(rs2);
 				// XXX: Offset, sp
 				break;
 			default:
-				fprintf(stderr, "\n");
-				errx(1, "unknown instruction %#x (opcode %#x) at address %p", instruction, opcode, (void *)pc);
+				crash(42);
+				errx(1, "unknown compressed instruction %#4x (1..0=%d 15..13=%d)",
+				    instruction, PICK(instruction, 2, 0), PICK(instruction, 3, 13));
 			}
 
 			pc += 2;
