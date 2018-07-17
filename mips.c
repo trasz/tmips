@@ -30,60 +30,57 @@ extern char **environ;
 #define	DO_SYSCALL do_syscall
 #endif
 
-#define	STACK_PAGES	3
-#define	DIE_ON_UNKNOWN
-
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
 
 #ifdef TRACE
-#define	TRACE_OPCODE(STR)	do {								\
-		if ((instruction & 0x3) == 0x3) {						\
-			linelen = fprintf(stderr, "\n%12llx:   %08x        %-7s ",		\
-			    (unsigned long long)pc, instruction, STR);				\
-		} else {									\
-			linelen = fprintf(stderr, "\n%12llx:   %04x            %-7s ",		\
-			    (unsigned long long)pc, instruction, STR);				\
-		}										\
-		had_args = false;								\
+#define	TRACE_OPCODE(STR)	do {							\
+		if ((instruction & 0x3) == 0x3) {					\
+			linelen = fprintf(stderr, "\n%12llx:   %08x        %-7s ",	\
+			    (unsigned long long)pc, instruction, STR);			\
+		} else {								\
+			linelen = fprintf(stderr, "\n%12llx:   %04x            %-7s ",	\
+			    (unsigned long long)pc, instruction, STR);			\
+		}									\
+		had_args = false;							\
 	} while (0)
 
-#define	TRACE_REG(REG)	do {									\
-		if (had_args == true)								\
-			linelen += fprintf(stderr, ",");					\
-		linelen += fprintf(stderr, "%s", register_name(REG));				\
-		had_args = true;								\
+#define	TRACE_REG(REG)	do {								\
+		if (had_args == true)							\
+			linelen += fprintf(stderr, ",");				\
+		linelen += fprintf(stderr, "%s", register_name(REG));			\
+		had_args = true;							\
 	} while (0)
 
-#define	TRACE_RESULT_REG(REG)	do {								\
-		const char *str;								\
-		str = fetch_string(reg[REG]);							\
-		fprintf(stderr, "%*s", 55 - linelen, "");					\
-		if (str != NULL) {								\
-			fprintf(stderr, "# %s := %#018lx (\"%s\")",				\
-			     register_name(REG), reg[REG], str);				\
-		} else if (REG != 0) {								\
-			fprintf(stderr, "# %s := %#018lx (%ld)",				\
-			     register_name(REG), reg[REG], reg[REG]);				\
-		}										\
+#define	TRACE_RESULT_REG(REG)	do {							\
+		const char *str;							\
+		str = fetch_string(reg[REG]);						\
+		fprintf(stderr, "%*s", 55 - linelen, "");				\
+		if (str != NULL) {							\
+			fprintf(stderr, "# %s := %#018lx (\"%s\")",			\
+			     register_name(REG), x[REG], str);				\
+		} else if (REG != 0) {							\
+			fprintf(stderr, "# %s := %#018lx (%ld)",			\
+			     register_name(REG), x[REG], x[REG]);			\
+		}									\
 	} while (0)
 
-#define	TRACE_IMM_REG(REG)	do {								\
-		if (had_args == true)								\
-			linelen += fprintf(stderr, ",");					\
-		linelen += fprintf(stderr, "%d(%s)", immediate, register_name(REG));		\
-		had_args = true;								\
+#define	TRACE_IMM_REG(IMM, REG)	do {							\
+		if (had_args == true)							\
+			linelen += fprintf(stderr, ",");				\
+		linelen += fprintf(stderr, "%d(%s)", IMM, register_name(REG));		\
+		had_args = true;							\
 	} while (0)
 
-#define	TRACE_IMM(IMM)	do {									\
-		if (had_args == true)								\
-			linelen += fprintf(stderr, ",");					\
-		linelen += fprintf(stderr, "%d", IMM);						\
-		had_args = true;								\
+#define	TRACE_IMM(IMM)	do {								\
+		if (had_args == true)							\
+			linelen += fprintf(stderr, ",");				\
+		linelen += fprintf(stderr, "%d", IMM);					\
+		had_args = true;							\
 	} while (0)
 
-#define	TRACE_STR(STR)	do {									\
-		fprintf(stderr, "%*s", 55 - linelen, "");					\
-		fprintf(stderr, "# %s", STR);							\
+#define	TRACE_STR(STR)	do {								\
+		fprintf(stderr, "%*s", 55 - linelen, "");				\
+		fprintf(stderr, "# %s", STR);						\
 	} while (0)
 
 static const char *register_names[32] = {
@@ -167,11 +164,9 @@ fetch_string(int64_t addr)
 #undef	TRACE_RESULT_REG
 #define TRACE_RESULT_REG(X)
 #undef	TRACE_IMM_REG
-#define TRACE_IMM_REG(X)
+#define TRACE_IMM_REG(IMM, X)
 #undef	TRACE_IMM
 #define TRACE_IMM(X)
-#undef	TRACE_JUMP
-#define TRACE_JUMP()
 #undef	TRACE_STR
 #define TRACE_STR(X)
 #endif /* !TRACE */
@@ -224,10 +219,8 @@ fetch_string(int64_t addr)
 #define	MIPS_C
 
 // CPU context.
-static int64_t	reg[32];
-static int64_t	hi;
-static int64_t	lo;
-static int	*pc;
+static int64_t	x[32];
+static char	*pc;
 
 static bool	had_args = false;
 static int	linelen;
@@ -262,34 +255,6 @@ push_string(int64_t sp, const char *str)
 }
 
 static void
-htobe32_addr(uint32_t *addr)
-{
-
-	*((uint32_t *)addr) = htobe32(*((uint32_t *)addr));
-}
-
-static void
-htobe64_addr(uint64_t *addr)
-{
-
-	*((uint64_t *)addr) = htobe64(*((uint64_t *)addr));
-}
-
-static void
-be32toh_addr(uint32_t *addr)
-{
-
-	*((uint32_t *)addr) = be32toh(*((uint32_t *)addr));
-}
-
-static void
-be64toh_addr(uint64_t *addr)
-{
-
-	*((uint64_t *)addr) = be64toh(*((uint64_t *)addr));
-}
-
-static void
 crash(int meh __unused)
 {
 
@@ -297,14 +262,14 @@ crash(int meh __unused)
 	fprintf(stderr, "\n\n");
 #endif
 	warnx("crashed at pc %#lx", (uint64_t)pc);
-	warnx("$0 = %-#18lx ra = %-#18lx sp = %-#18lx gp = %-#18lx", reg[0], reg[1], reg[2], reg[3]);
-	warnx("tp = %-#18lx t0 = %-#18lx t2 = %-#18lx t3 = %-#18lx", reg[4], reg[5], reg[6], reg[7]);
-	warnx("s0 = %-#18lx s1 = %-#18lx a0 = %-#18lx a1 = %-#18lx", reg[8], reg[9], reg[10], reg[11]);
-	warnx("a2 = %-#18lx a3 = %-#18lx a4 = %-#18lx a5 = %-#18lx", reg[12], reg[13], reg[14], reg[15]);
-	warnx("a6 = %-#18lx a7 = %-#18lx s2 = %-#18lx s3 = %-#18lx", reg[16], reg[17], reg[18], reg[19]);
-	warnx("s4 = %-#18lx s5 = %-#18lx s6 = %-#18lx s7 = %-#18lx", reg[20], reg[21], reg[22], reg[23]);
-	warnx("s8 = %-#18lx s9 = %-#18lx s10= %-#18lx s11= %-#18lx", reg[24], reg[25], reg[26], reg[27]);
-	warnx("t3 = %-#18lx t4 = %-#18lx t5 = %-#18lx t6 = %-#18lx", reg[28], reg[29], reg[30], reg[31]);
+	warnx("$0 = %-#18lx ra = %-#18lx sp = %-#18lx gp = %-#18lx", x[0], x[1], x[2], x[3]);
+	warnx("tp = %-#18lx t0 = %-#18lx t2 = %-#18lx t3 = %-#18lx", x[4], x[5], x[6], x[7]);
+	warnx("s0 = %-#18lx s1 = %-#18lx a0 = %-#18lx a1 = %-#18lx", x[8], x[9], x[10], x[11]);
+	warnx("a2 = %-#18lx a3 = %-#18lx a4 = %-#18lx a5 = %-#18lx", x[12], x[13], x[14], x[15]);
+	warnx("a6 = %-#18lx a7 = %-#18lx s2 = %-#18lx s3 = %-#18lx", x[16], x[17], x[18], x[19]);
+	warnx("s4 = %-#18lx s5 = %-#18lx s6 = %-#18lx s7 = %-#18lx", x[20], x[21], x[22], x[23]);
+	warnx("s8 = %-#18lx s9 = %-#18lx s10= %-#18lx s11= %-#18lx", x[24], x[25], x[26], x[27]);
+	warnx("t3 = %-#18lx t4 = %-#18lx t5 = %-#18lx t6 = %-#18lx", x[28], x[29], x[30], x[31]);
 
 	signal(SIGBUS, SIG_DFL);
 	signal(SIGSEGV, SIG_DFL);
@@ -337,71 +302,14 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
     int64_t a3, int64_t a4, int64_t a5)
 {
 	off_t rv;
-	int i;
 
 #ifdef TRACE
 	fprintf(stderr, "              # syscall(%ld, %#lx, %#lx, %#lx, %#lx, %#lx, %#lx)",
 	    number, a0, a1, a2, a3, a4, a5);
 #endif
-	switch (number) {
-	case SYS___sysctl:
-		for (i = 0; i < a1; i++)
-			be32toh_addr((uint32_t *)a0 + i);
-		be64toh_addr((uint64_t *)a3);
-		break;
-	case SYS_sigaction:
-		if (a1 != 0) {
-			be64toh_addr((uint64_t *)a1);
-			be64toh_addr((uint64_t *)(a1 + 7));
-			be32toh_addr((uint32_t *)(a1 + 15));
-			be32toh_addr((uint32_t *)(a1 + 19));
-		}
-		break;
-	case SYS_sigprocmask:
-		if (a1 != 0)
-			be32toh_addr((uint32_t *)a1);
-		break;
-	}
 
 	rv = __syscall(number, a0, a1, a2, a3, a4, a5);
 
-	switch (number) {
-	case SYS___sysctl:
-		if (a1 == 2 && *((uint32_t *)a0) == 0 && *((uint32_t *)a0 + 1) == 3) {
-			/* It's sysctl.name2oid, used by sysctlnametomib(3).  Yeah, sorry. */
-			for (i = 0; i < *(int64_t *)a3 / 4; i++)
-				htobe32_addr((uint32_t *)a2 + i);
-		} else if (*(uint64_t *)a3 == 4) {
-			htobe32_addr((uint32_t *)a2);
-		} else if (*(uint64_t *)a3 == 8) {
-			htobe64_addr((uint64_t *)a2);
-		}
-		for (i = 0; i < a1; i++)
-			htobe32_addr((uint32_t *)a0 + i);
-		htobe64_addr((uint64_t *)a3);
-		break;
-	case SYS_sigaction:
-		if (a1 != 0) {
-			htobe64_addr((uint64_t *)a1);
-			htobe64_addr((uint64_t *)(a1 + 7));
-			htobe32_addr((uint32_t *)(a1 + 15));
-			htobe32_addr((uint32_t *)(a1 + 19));
-		}
-		if (a2 != 0) {
-			htobe64_addr((uint64_t *)a2);
-			htobe64_addr((uint64_t *)(a2 + 7));
-			htobe32_addr((uint32_t *)(a2 + 15));
-			htobe32_addr((uint32_t *)(a2 + 19));
-		}
-		break;
-	case SYS_sigprocmask:
-		if (a2 != 0)
-			htobe32_addr((uint32_t *)a2);
-		break;
-	case SYS_thr_self:
-		htobe64_addr((uint64_t *)a0);
-		break;
-	}
 #ifdef TRACE
 	fprintf(stderr, " = %#018lx (%ld); errno %d", rv, rv, errno);
 #endif
@@ -416,7 +324,6 @@ RUN(int *pcc, int argc, char **argv)
 	char **ps_strings;
 	int instruction, imm_11_0, opcode, rd, rs1, rd_rs1, rs2;
 	uint64_t sp;
-	unsigned char *pc;
 	int i, j;
 
 	map_stack();
@@ -442,21 +349,18 @@ RUN(int *pcc, int argc, char **argv)
 	ps_strings[i++] = 0;
 
 	// Set up the initial CPU state.
-	memset(reg, 0, sizeof(reg));
-	hi = 0;
-	lo = 0;
-	pc = pcc;
-	reg[0] = 0;
-	reg[4] = (int64_t)ps_strings;		// a0, should be 0x7fffffebb0
-	reg[25] = (int64_t)pc;			// t9
-	reg[29] = (int64_t)0x7fffffebb0;	// sp, should be 0x7fffffeb70
+	memset(x, 0, sizeof(x));
+	pc = (char *)pcc;
+	x[4] = (int64_t)ps_strings;		// a0, should be 0x7fffffebb0
+	x[25] = (int64_t)pc;			// t9
+	x[29] = (int64_t)0x7fffffebb0;	// sp, should be 0x7fffffeb70
 
 	// Just in case.
 	crash_handlers();
 
 	// Run!
 	for (;;) {
-		reg[0] = 0;
+		x[0] = 0;
 
 		instruction = *(uint32_t *)pc;
 
@@ -506,13 +410,8 @@ RUN(int *pcc, int argc, char **argv)
 					// XXX: Offset
 					break;
 				default:
-#ifdef DIE_ON_UNKNOWN
 					fprintf(stderr, "\n");
 					errx(1, "unknown instruction %#x (opcode %#x) at address %p", instruction, opcode, (void *)pc);
-#else
-					TRACE_OPCODE("UNKNOWN");
-					fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
-#endif
 				}
 			}
 
@@ -587,13 +486,8 @@ RUN(int *pcc, int argc, char **argv)
 				// XXX: Offset, sp
 				break;
 			default:
-#ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
 				errx(1, "unknown instruction %#x (opcode %#x) at address %p", instruction, opcode, (void *)pc);
-#else
-				TRACE_OPCODE("UNKNOWN");
-				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
-#endif
 			}
 
 			pc += 2;
