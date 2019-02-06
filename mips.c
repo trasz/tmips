@@ -60,7 +60,7 @@ extern char **environ;
 			     register_name(REG), reg[REG], str);				\
 		} else if (REG != 0) {								\
 			fprintf(stderr, "# %s := %#018lx (%ld)",				\
-			     register_name(REG), reg[REG], reg[REG]);				\
+			     register_name(REG), reg[REG], (int64_t)reg[REG]);			\
 		}										\
 	} while (0)
 
@@ -353,7 +353,7 @@ fetch_string(int64_t addr)
 #define	MIPS_C
 
 // CPU context.
-static int64_t	reg[32];
+static uint64_t	reg[32];
 static uint64_t	hi;
 static uint64_t	lo;
 static uint32_t	*pc;
@@ -601,7 +601,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = (int32_t)reg[rt] << sa;
+				reg[rd] = reg[rt] << sa;
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SRL:
@@ -609,7 +609,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = (uint32_t)reg[rt] >> sa;
+				reg[rd] = reg[rt] >> sa;
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SRA:
@@ -625,7 +625,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
-				reg[rd] = (uint32_t)reg[rt] << reg[rs];
+				reg[rd] = reg[rt] << reg[rs];
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_SRLV:
@@ -633,7 +633,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
-				reg[rd] = (uint32_t)reg[rt] > reg[rs];
+				reg[rd] = reg[rt] > reg[rs];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -648,16 +648,16 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("jr");
 				TRACE_RS();
 				pc++;
-				next_pc = (uint32_t *)reg[rs];
+				next_pc = reg[rs];
 				continue;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
 				TRACE_RD();
 				TRACE_RS();
-				reg[rd] = (int64_t)(next_pc + 1);
+				reg[rd] = (uint64_t)(next_pc + 1);
 				TRACE_RESULT_RD();
 				pc++;
-				next_pc = (uint32_t *)reg[rs];
+				next_pc = reg[rs];
 				continue;
 #if 0
 			case FUNCT_SPECIAL_MOVZ:
@@ -736,7 +736,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
-				reg[rd] = (uint64_t)reg[rt] >> reg[rs];
+				reg[rd] = reg[rt] >> reg[rs];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -751,7 +751,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("mult");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (int64_t)((int32_t)reg[rs]) * (uint32_t)reg[rt];
+				lo = (int64_t)((int32_t)reg[rs]) * (int32_t)reg[rt];
 				hi = lo & (0xffffffffull << 32);
 				lo = hi & 0xffffffff;
 				break;
@@ -759,7 +759,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("multu");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (uint64_t)(int32_t)reg[rs] * (uint32_t)reg[rt];
+				lo = (uint32_t)reg[rs] * (uint32_t)reg[rt];
 				hi = lo & (0xffffffffull << 32);
 				lo = hi & 0xffffffff;
 				break;
@@ -779,14 +779,14 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("dmult");
 				TRACE_RS();
 				TRACE_RT();
-				lo = reg[rs] * reg[rt];
+				lo = (int64_t)reg[rs] * (int64_t)reg[rt];
 				hi = 0; // XXX
 				break;
 			case FUNCT_SPECIAL_DMULTU:
 				TRACE_OPCODE("dmultu");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (uint64_t)reg[rs] * (uint64_t)reg[rt];
+				lo = reg[rs] * reg[rt];
 				hi = 0; // XXX
 				break;
 #if 0
@@ -800,15 +800,15 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("ddivu");
 				TRACE_RS();
 				TRACE_RT();
-				lo = (uint64_t)reg[rs] / (uint64_t)reg[rt];
-				hi = (uint64_t)reg[rs] % (uint64_t)reg[rt];
+				lo = reg[rs] / reg[rt];
+				hi = reg[rs] % reg[rt];
 				break;
 			case FUNCT_SPECIAL_ADD:
 				TRACE_OPCODE("add");
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = reg[rs] + reg[rt];
+				reg[rd] = (int32_t)reg[rs] + (int32_t)reg[rt];
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_ADDU:
@@ -816,7 +816,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = reg[rs] + reg[rt];
+				reg[rd] = (uint32_t)reg[rs] + (uint32_t)reg[rt];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -869,7 +869,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				if (reg[rs] < reg[rt])
+				if ((int64_t)reg[rs] < (int64_t)reg[rt])
 					reg[rd] = 1;
 				else
 					reg[rd] = 0;
@@ -880,7 +880,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				if ((uint64_t)reg[rs] < (uint64_t)reg[rt])
+				if (reg[rs] < reg[rt])
 					reg[rd] = 1;
 				else
 					reg[rd] = 0;
@@ -891,7 +891,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = reg[rs] + reg[rt];
+				reg[rd] = (int64_t)reg[rs] + (int64_t)reg[rt];
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DADDU:
@@ -907,7 +907,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = reg[rs] - reg[rt];
+				reg[rd] = (int64_t)reg[rs] - (int64_t)reg[rt];
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSUBU:
@@ -915,7 +915,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RS();
 				TRACE_RT();
-				reg[rd] = (uint64_t)reg[rs] - (uint64_t)reg[rt];
+				reg[rd] = reg[rs] - reg[rt];
 				TRACE_RESULT_RD();
 				break;
 #if 0
@@ -966,7 +966,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = (uint64_t)reg[rt] >> sa;
+				reg[rd] = reg[rt] >> sa;
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRA:
@@ -974,7 +974,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = reg[rt] >> sa;
+				reg[rd] = (int64_t)reg[rt] >> sa;
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSLL32:
@@ -990,7 +990,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = (uint64_t)reg[rt] >> (sa + 32);
+				reg[rd] = reg[rt] >> (sa + 32);
 				TRACE_RESULT_RD();
 				break;
 			case FUNCT_SPECIAL_DSRA32:
@@ -998,7 +998,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_SA();
-				reg[rd] = reg[rt] >> (sa + 32);
+				reg[rd] = (int64_t)reg[rt] >> (sa + 32);
 				TRACE_RESULT_RD();
 				break;
 			default:
@@ -1021,7 +1021,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("bltz");
 				TRACE_RS();
 				TRACE_IMM();
-				if (reg[rs] < 0) {
+				if ((int64_t)reg[rs] < 0) {
 					pc++;
 					// We're not shifting left by two, because pc is already an (int *).
 					next_pc = next_pc + immediate;
@@ -1033,7 +1033,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("bgez");
 				TRACE_RS();
 				TRACE_IMM();
-				if (reg[rs] >= 0) {
+				if ((int64_t)reg[rs] >= 0) {
 					pc++;
 					// We're not shifting left by two, because pc is already an (int *).
 					next_pc = next_pc + immediate;
@@ -1045,7 +1045,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_OPCODE("bgezl");
 				TRACE_RS();
 				TRACE_IMM();
-				if (reg[rs] >= 0) {
+				if ((int64_t)reg[rs] >= 0) {
 					pc++;
 					// We're not shifting left by two, because pc is already an (int *).
 					next_pc = next_pc + immediate;
@@ -1060,7 +1060,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			case FUNCT_REGIMM_BAL:
 				TRACE_OPCODE("bal");
 				TRACE_IMM();
-				reg[31] = (int64_t)(next_pc + 1);
+				reg[31] = next_pc + 1;
 				TRACE_RESULT_REG(31);
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
@@ -1120,7 +1120,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_OPCODE("blez");
 			TRACE_RS();
 			TRACE_IMM();
-			if (reg[rs] <= 0) {
+			if ((int64_t)reg[rs] <= 0) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
 				next_pc = next_pc + immediate;
@@ -1133,7 +1133,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_OPCODE("bgtz");
 			TRACE_RS();
 			TRACE_IMM();
-			if (reg[rs] > 0) {
+			if ((int64_t)reg[rs] > 0) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
 				next_pc = next_pc + immediate;
@@ -1147,14 +1147,14 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
+			reg[rt] = (int32_t)reg[rs] + immediate;
 			break;
 		case OPCODE_ADDIU:
 			TRACE_OPCODE("addiu");
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			reg[rt] = (int64_t)((int32_t)reg[rs]) + immediate;
+			reg[rt] = (uint64_t)reg[rs] + immediate;
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_SLTI:
@@ -1162,7 +1162,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			if (reg[rs] < immediate)
+			if ((int64_t)reg[rs] < immediate)
 				reg[rt] = 1;
 			else
 				reg[rt] = 0;
@@ -1173,7 +1173,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_RS();
 			TRACE_IMM();
-			if ((uint64_t)reg[rs] < (uint64_t)immediate)
+			if ((int64_t)reg[rs] < immediate)
 				reg[rt] = 1;
 			else
 				reg[rt] = 0;
@@ -1207,7 +1207,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_OPCODE("lui");
 			TRACE_RT();
 			TRACE_IMM();
-			reg[rt] = (int32_t)immediate << 16;
+			reg[rt] = immediate << 16;
 			TRACE_RESULT_RT();
 			break;
 		case OPCODE_BEQL:
@@ -1248,7 +1248,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_OPCODE("bgtzl");
 			TRACE_RS();
 			TRACE_IMM();
-			if (reg[rs] > 0) {
+			if ((int64_t)reg[rs] > 0) {
 				pc++;
 				// We're not shifting left by two, because pc is already an (int *).
 				next_pc = next_pc + immediate;
@@ -1293,7 +1293,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			case FUNCT_SPECIAL3_RDHWR:
 				TRACE_OPCODE("rdhwr");
 				TRACE_RT();
-				reg[rt] = 0; // XXX
+				reg[rt] = 0xbaddc0de; // XXX
 				TRACE_RESULT_RT();
 			break;
 			default:
