@@ -354,9 +354,9 @@ fetch_string(int64_t addr)
 
 // CPU context.
 static int64_t	reg[32];
-static int64_t	hi;
-static int64_t	lo;
-static int	*pc;
+static uint64_t	hi;
+static uint64_t	lo;
+static uint32_t	*pc;
 
 static bool	had_args = false;
 static int	linelen;
@@ -528,14 +528,15 @@ DO_SYSCALL(int64_t number, int64_t a0, int64_t a1, int64_t a2,
 }
 
 static int
-RUN(int *pcc, int argc, char **argv)
+RUN(uint32_t *pcc, int argc, char **argv)
 {
 	char **ps_strings;
 	uint64_t sp;
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
-	int i, j, *next_pc;
+	uint32_t *next_pc;
+	int i, j;
 
 	map_stack();
 
@@ -647,7 +648,7 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_OPCODE("jr");
 				TRACE_RS();
 				pc++;
-				next_pc = (int *)reg[rs];
+				next_pc = (uint32_t *)reg[rs];
 				continue;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
@@ -656,7 +657,7 @@ RUN(int *pcc, int argc, char **argv)
 				reg[rd] = (int64_t)(next_pc + 1);
 				TRACE_RESULT_RD();
 				pc++;
-				next_pc = (int *)reg[rs];
+				next_pc = (uint32_t *)reg[rs];
 				continue;
 #if 0
 			case FUNCT_SPECIAL_MOVZ:
