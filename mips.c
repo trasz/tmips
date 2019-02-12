@@ -633,7 +633,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
-				reg[rd] = reg[rt] > reg[rs];
+				reg[rd] = reg[rt] >> reg[rs];
 				TRACE_RESULT_RD();
 				break;
 #if 0
