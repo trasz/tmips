@@ -590,8 +590,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 		rd = (instruction & (0x1F << 11)) >> 11;
 		sa = (instruction & (0x1F << 6)) >> 6;
 
-		immediate = (instruction << 16) >> 16;
-		uimmediate = (immediate << 16) >> 16;
+		immediate = 0xffff & instruction;
+		uimmediate = 0xffff & instruction;
 
 		switch (opcode) {
 		case OPCODE_SPECIAL:
