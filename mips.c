@@ -354,9 +354,9 @@ fetch_string(int64_t addr)
 
 // CPU context.
 static uint64_t	reg[32];
+static uint64_t	pc;
 static uint64_t	hi;
 static uint64_t	lo;
-static uint32_t	*pc;
 
 static bool	had_args = false;
 static int	linelen;
@@ -425,7 +425,7 @@ crash(int meh __unused)
 #ifdef TRACE
 	fprintf(stderr, "\n\n");
 #endif
-	warnx("crashed at pc %#lx", (uint64_t)pc);
+	warnx("crashed at pc %#lx", pc);
 	warnx("$0 = %-#18lx at = %-#18lx v0 = %-#18lx v1 = %-#18lx", reg[0], reg[1], reg[2], reg[3]);
 	warnx("a0 = %-#18lx a1 = %-#18lx a2 = %-#18lx a3 = %-#18lx", reg[4], reg[5], reg[6], reg[7]);
 	warnx("a4 = %-#18lx a5 = %-#18lx a6 = %-#18lx a7 = %-#18lx", reg[8], reg[9], reg[10], reg[11]);
@@ -531,11 +531,10 @@ static int
 RUN(uint32_t *pcc, int argc, char **argv)
 {
 	char **ps_strings;
-	uint64_t sp;
+	uint64_t sp, next_pc;
 	uint32_t rs, rt, rd, sa, instruction, opcode, funct;
 	uint16_t uimmediate;
 	int16_t immediate;
-	uint32_t *next_pc;
 	int i, j;
 	void *tls;
 
@@ -565,13 +564,13 @@ RUN(uint32_t *pcc, int argc, char **argv)
 	memset(reg, 0, sizeof(reg));
 	hi = 0;
 	lo = 0;
-	pc = pcc;
+	pc = (uint64_t)pcc;
 	reg[0] = 0;
 	reg[4] = (int64_t)ps_strings;		// a0, should be 0x7fffffebb0
-	reg[25] = (int64_t)pc;			// t9
+	reg[25] = pc;				// t9
 	reg[29] = (int64_t)0x7fffffebb0;	// sp, should be 0x7fffffeb70
 
-	next_pc = pc + 1;
+	next_pc = pc + 4;
 
 	// Just in case.
 	crash_handlers();
@@ -582,7 +581,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 	for (;;) {
 		reg[0] = 0;
 
-		instruction = be32toh(*pc);
+		instruction = be32toh(*(int *)pc);
 
 		opcode = (instruction & (0x3Ful << 26)) >> 26;
 
@@ -650,16 +649,16 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
 				TRACE_RS();
-				pc++;
+				pc += 4;
 				next_pc = reg[rs];
 				continue;
 			case FUNCT_SPECIAL_JALR:
 				TRACE_OPCODE("jalr");
 				TRACE_RD();
 				TRACE_RS();
-				reg[rd] = (uint64_t)(next_pc + 1);
+				reg[rd] = next_pc + 4;
 				TRACE_RESULT_RD();
-				pc++;
+				pc += 4;
 				next_pc = reg[rs];
 				continue;
 #if 0
@@ -1007,7 +1006,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown special opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+				errx(1, "unknown special opcode %#x, function %#x at address %#lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("SPECIAL");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1025,9 +1024,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_IMM();
 				if ((int64_t)reg[rs] < 0) {
-					pc++;
-					// We're not shifting left by two, because pc is already an (int *).
-					next_pc = next_pc + immediate;
+					pc += 4;
+					next_pc = next_pc + (immediate << 2);
 					TRACE_STR("taken");
 					continue;
 				}
@@ -1037,9 +1035,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_IMM();
 				if ((int64_t)reg[rs] >= 0) {
-					pc++;
-					// We're not shifting left by two, because pc is already an (int *).
-					next_pc = next_pc + immediate;
+					pc += 4;
+					next_pc = next_pc + (immediate << 2);
 					TRACE_STR("taken");
 					continue;
 				}
@@ -1049,30 +1046,28 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				TRACE_RS();
 				TRACE_IMM();
 				if ((int64_t)reg[rs] >= 0) {
-					pc++;
-					// We're not shifting left by two, because pc is already an (int *).
-					next_pc = next_pc + immediate;
+					pc += 4;
+					next_pc = next_pc + (immediate << 2);
 					TRACE_STR("taken");
 				} else {
 					// Skip the delay slot.
-					pc += 2;
-					next_pc = pc + 1;
+					pc += 8;
+					next_pc = pc + 4;
 					TRACE_STR("not taken; delay slot skipped");
 				}
 				continue;
 			case FUNCT_REGIMM_BAL:
 				TRACE_OPCODE("bal");
 				TRACE_IMM();
-				reg[31] = next_pc + 1;
+				reg[31] = next_pc + 4;
 				TRACE_RESULT_REG(31);
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				continue;
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown regimm opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+				errx(1, "unknown regimm opcode %#x, function %#x at address %#lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("REGIMM");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1097,9 +1092,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM();
 			if (reg[rs] == reg[rt]) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 				continue;
 			}
@@ -1111,9 +1105,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM();
 			if (reg[rs] != reg[rt]) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 				continue;
 			}
@@ -1124,9 +1117,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RS();
 			TRACE_IMM();
 			if ((int64_t)reg[rs] <= 0) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 				continue;
 			}
@@ -1137,9 +1129,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RS();
 			TRACE_IMM();
 			if ((int64_t)reg[rs] > 0) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 				continue;
 			}
@@ -1219,14 +1210,13 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM();
 			if (reg[rs] == reg[rt]) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 			} else {
 				// Skip the delay slot.
-				pc += 2;
-				next_pc = pc + 1;
+				pc += 8;
+				next_pc = pc + 4;
 				TRACE_STR("not taken; delay slot skipped");
 			}
 			continue;
@@ -1236,14 +1226,13 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RT();
 			TRACE_IMM();
 			if (reg[rs] != reg[rt]) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 			} else {
 				// Skip the delay slot.
-				pc += 2;
-				next_pc = pc + 1;
+				pc += 8;
+				next_pc = pc + 4;
 				TRACE_STR("not taken; delay slot skipped");
 			}
 			continue;
@@ -1252,14 +1241,13 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			TRACE_RS();
 			TRACE_IMM();
 			if ((int64_t)reg[rs] > 0) {
-				pc++;
-				// We're not shifting left by two, because pc is already an (int *).
-				next_pc = next_pc + immediate;
+				pc += 4;
+				next_pc = next_pc + (immediate << 2);
 				TRACE_STR("taken");
 			} else {
 				// Skip the delay slot.
-				pc += 2;
-				next_pc = pc + 1;
+				pc += 8;
+				next_pc = pc + 4;
 				TRACE_STR("not taken; delay slot skipped");
 			}
 			continue;
@@ -1310,7 +1298,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown special3 opcode %#x, function %#x at address %p", opcode, funct, (void *)pc);
+				errx(1, "unknown special3 opcode %#x, function %#x at address %#lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("SPECIAL");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1502,7 +1490,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 		default:
 #ifdef DIE_ON_UNKNOWN
 			fprintf(stderr, "\n");
-			errx(1, "unknown opcode %#x at address %p", opcode, (void *)pc);
+			errx(1, "unknown opcode %#x at address %#lx", opcode, pc);
 #else
 			TRACE_OPCODE("UNKNOWN");
 			fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1510,7 +1498,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 		}
 
 		pc = next_pc;
-		next_pc++;
+		next_pc += 4;
 	}
 
 	return (0);
