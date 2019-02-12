@@ -638,14 +638,14 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				reg[rd] = reg[rt] >> reg[rs];
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_SRAV:
 				TRACE_OPCODE("srav");
 				TRACE_RD();
 				TRACE_RT();
 				TRACE_RS();
+				reg[rd] = (int64_t)((int32_t)reg[rt] >> (0x1f & reg[rs]));
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_JR:
 				TRACE_OPCODE("jr");
 				TRACE_RS();
