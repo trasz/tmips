@@ -1006,7 +1006,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown special opcode %#x, function %#x at address %#lx", opcode, funct, pc);
+				errx(1, "unknown special opcode %#x, function %#x at address %lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("SPECIAL");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1067,7 +1067,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown regimm opcode %#x, function %#x at address %#lx", opcode, funct, pc);
+				errx(1, "unknown regimm opcode %#x, function %#x at address %lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("REGIMM");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1298,7 +1298,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
-				errx(1, "unknown special3 opcode %#x, function %#x at address %#lx", opcode, funct, pc);
+				errx(1, "unknown special3 opcode %#x, function %#x at address %lx", opcode, funct, pc);
 #else
 				TRACE_OPCODE("SPECIAL");
 				fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
@@ -1490,7 +1490,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 		default:
 #ifdef DIE_ON_UNKNOWN
 			fprintf(stderr, "\n");
-			errx(1, "unknown opcode %#x at address %#lx", opcode, pc);
+			errx(1, "unknown opcode %#x at address %lx", opcode, pc);
 #else
 			TRACE_OPCODE("UNKNOWN");
 			fprintf(stderr, "(opcode %#x, function %#x)", opcode, funct);
