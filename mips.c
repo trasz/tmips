@@ -1313,10 +1313,14 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			reg[rt] = *((volatile int8_t *)(reg[rs] + immediate));
 			TRACE_RESULT_RT();
 			break;
-#if 0
 		case OPCODE_LH:
 			TRACE_OPCODE("lh");
+			TRACE_RT();
+			TRACE_IMM_RS();
+			reg[rt] = *((volatile int16_t *)(reg[rs] + immediate));
+			TRACE_RESULT_RT();
 			break;
+#if 0
 		case OPCODE_LWL:
 			TRACE_OPCODE("lwl");
 			TRACE_RT();
