@@ -537,6 +537,7 @@ RUN(uint32_t *pcc, int argc, char **argv)
 	int16_t immediate;
 	uint32_t *next_pc;
 	int i, j;
+	void *tls;
 
 	map_stack();
 
@@ -574,6 +575,8 @@ RUN(uint32_t *pcc, int argc, char **argv)
 
 	// Just in case.
 	crash_handlers();
+
+	tls = malloc(10 * 1024 * 1024);
 
 	// Run!
 	for (;;) {
@@ -1293,9 +1296,17 @@ RUN(uint32_t *pcc, int argc, char **argv)
 			case FUNCT_SPECIAL3_RDHWR:
 				TRACE_OPCODE("rdhwr");
 				TRACE_RT();
-				reg[rt] = 0xbaddc0de; // XXX
+				immediate = (int16_t)rd; // Just for TRACE_IMM to display correctly.
+				TRACE_IMM();
+				switch (rd) {
+				case 29:
+					reg[rt] = (uint64_t)tls;
+					break;
+				default:
+					reg[rt] = 0xbaddc0de; // XXX
+				}
 				TRACE_RESULT_RT();
-			break;
+				break;
 			default:
 #ifdef DIE_ON_UNKNOWN
 				fprintf(stderr, "\n");
