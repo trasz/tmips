@@ -853,11 +853,14 @@ RUN(uint32_t *pcc, int argc, char **argv)
 				reg[rd] = reg[rs] | reg[rt];
 				TRACE_RESULT_RD();
 				break;
-#if 0
 			case FUNCT_SPECIAL_XOR:
 				TRACE_OPCODE("xor");
+				TRACE_RD();
+				TRACE_RS();
+				TRACE_RT();
+				reg[rd] = reg[rs] ^ reg[rt];
+				TRACE_RESULT_RD();
 				break;
-#endif
 			case FUNCT_SPECIAL_NOR:
 				TRACE_OPCODE("nor");
 				TRACE_RD();
