@@ -1,11 +1,13 @@
 #!/bin/sh
 
+OBJDUMP="riscv64-unknown-freebsd13.0-objdump"
+
 if [ $# -ne 2 ]; then
 	echo "usage: $0 binary-path trace" > /dev/stderr
 	exit 1
 fi
 
-./objdump -d "$1" | awk '
+${OBJDUMP} -d "$1" | awk '
 	BEGIN {
 		maxdepth = 6
 	}

@@ -1,5 +1,5 @@
 CFLAGS+=	-Wall -Wextra -Wno-sign-conversion -Wno-bad-function-cast -pedantic -O3 -march=native -mtune=native -ggdb -lelf -L/usr/lib
-CC=		gcc6
+CC=		gcc8
 
 default: all
 

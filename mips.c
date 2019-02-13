@@ -35,10 +35,10 @@ extern char **environ;
 #define	TRACE_OPCODE(STR)	do {							\
 		if ((instruction & 0x3) == 0x3) {					\
 			linelen = fprintf(stderr, "\n%12lx:\t%08x        \t%-7s ",	\
-			    (intptr_t)pc, instruction, STR);				\
+			    pc, instruction, STR);					\
 		} else {								\
 			linelen = fprintf(stderr, "\n%12lx:\t%04x            \t%-7s ",	\
-			    (intptr_t)pc, instruction & 0xffff, STR);			\
+			    pc, instruction & 0xffff, STR);				\
 		}									\
 		had_args = false;							\
 	} while (0)
@@ -220,8 +220,8 @@ fetch_string(int64_t addr)
 #define	MIPS_C
 
 // CPU context.
-static int64_t	x[32];
-static char	*pc;
+static uint64_t	x[32];
+static uint64_t	pc;
 
 static bool	had_args = false;
 static int	linelen;
@@ -262,10 +262,10 @@ crash(int meh __unused)
 #ifdef TRACE
 	fprintf(stderr, "\n\n");
 #endif
-	warnx("crashed at pc %p", pc);
-	warnx("$0: %-#18lx ra: %-#18lx  sp: %-#18lx  gp: %-#18lx", x[0], x[1], x[2], x[3]);
-	warnx("tp: %-#18lx t0: %-#18lx  t1: %-#18lx  t2: %-#18lx", x[4], x[5], x[6], x[7]);
-	warnx("s0: %-#18lx s1: %-#18lx  a0: %-#18lx  a1: %-#18lx", x[8], x[9], x[10], x[11]);
+	warnx("crashed at pc %lx", pc);
+	warnx("$0: %-#18lx ra: %-#18lx  sp: %-#18lx  gp: %-#18lx", x[0],  x[1],  x[2],  x[3]);
+	warnx("tp: %-#18lx t0: %-#18lx  t1: %-#18lx  t2: %-#18lx", x[4],  x[5],  x[6],  x[7]);
+	warnx("s0: %-#18lx s1: %-#18lx  a0: %-#18lx  a1: %-#18lx", x[8],  x[9],  x[10], x[11]);
 	warnx("a2: %-#18lx a3: %-#18lx  a4: %-#18lx  a5: %-#18lx", x[12], x[13], x[14], x[15]);
 	warnx("a6: %-#18lx a7: %-#18lx  s2: %-#18lx  s3: %-#18lx", x[16], x[17], x[18], x[19]);
 	warnx("s4: %-#18lx s5: %-#18lx  s6: %-#18lx  s7: %-#18lx", x[20], x[21], x[22], x[23]);
@@ -358,7 +358,7 @@ RUN(int *pcc, int argc, char **argv)
 	// Set up the initial CPU state.  This needs to match
 	// sys/riscv/riscv/machdep.c:exec_setregs().
 	memset(x, 0, sizeof(x));
-	pc = (char *)pcc;
+	pc = (uint64_t)pcc;
 
 	x[10] = sp; /* a0 */
 	x[2] = STACKALIGN(sp); /* sp */
@@ -386,9 +386,9 @@ RUN(int *pcc, int argc, char **argv)
 			rs2 = PICK(instruction, 5, 20);
 			imm_i = PICK(instruction, 12, 20);
 			imm_s = PICK(instruction, 4, 7) | PICK(instruction, 12, 25) << 5;
-			imm_b = (uintptr_t)pc + (PICK(instruction, 1, 31) << 12 | PICK(instruction, 6, 25) << 5 | PICK(instruction, 4, 8) << 1 | PICK(instruction, 1, 7) << 11);
+			imm_b = pc + (PICK(instruction, 1, 31) << 12 | PICK(instruction, 6, 25) << 5 | PICK(instruction, 4, 8) << 1 | PICK(instruction, 1, 7) << 11);
 			imm_u = PICK(instruction, 20, 12);
-			imm_j = (uintptr_t)pc + (PICK(instruction, 1, 31) << 20 | PICK(instruction, 10, 21) << 1 | PICK(instruction, 1, 20) << 11 | PICK(instruction, 8, 12) << 12); /* srsly */
+			imm_j = pc + (PICK(instruction, 1, 31) << 20 | PICK(instruction, 10, 21) << 1 | PICK(instruction, 1, 20) << 11 | PICK(instruction, 8, 12) << 12); /* srsly */
 
 			/*
 			 * Opcodes from "opcodes.h" go here.
@@ -401,7 +401,9 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_IMM(imm_b);
 				if (x[rs1] == x[rs2]) {
 					TRACE_STR("taken");
-					pc = (char *)imm_b;
+					// Note that imm_b already includes pc.  It's done that way for compatibility
+					// with GNU objdump.
+					pc = imm_b;
 					continue;
 				}
 				TRACE_STR("not taken");
@@ -413,7 +415,7 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_IMM(imm_b);
 				if (x[rs1] != x[rs2]) {
 					TRACE_STR("taken");
-					pc = (char *)imm_b;
+					pc = imm_b;
 					continue;
 				}
 				TRACE_STR("not taken");
@@ -425,7 +427,7 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_IMM(imm_b);
 				if (x[rs1] >= x[rs2]) {
 					TRACE_STR("taken");
-					pc = (char *)imm_b;
+					pc = imm_b;
 					continue;
 				}
 				TRACE_STR("not taken");
@@ -455,6 +457,8 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_REG(rd);
 				TRACE_REG(rs1);
 				TRACE_IMM(imm_i);
+				x[rd] = x[rs1] << imm_i;
+				TRACE_RESULT_REG(rd);
 				break;
 			case OP_SRAI:
 				TRACE_OPCODE("srai");
@@ -474,6 +478,9 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_OPCODE("ld");
 				TRACE_REG(rd);
 				TRACE_IMM_REG(imm_i, rs1);
+				// XXX: Something's fishy here.
+				x[rd] = (uint64_t)(x[rs1] + imm_i);
+				TRACE_RESULT_REG(rd);
 				break;
 			case OP_LBU:
 				TRACE_OPCODE("lbu");
@@ -509,22 +516,25 @@ RUN(int *pcc, int argc, char **argv)
 					TRACE_OPCODE("auipc");
 					TRACE_REG(rd);
 					TRACE_IMM(imm_u);
-					x[rd] = (uint64_t)pc + ((uint64_t)imm_u << 12);
+					x[rd] = pc + ((uint64_t)imm_u << 12);
 					TRACE_RESULT_REG(rd);
 					break;
 				case OP_JAL:
 					TRACE_OPCODE("jal");
 					TRACE_REG(rd);
 					TRACE_IMM(imm_j);
-					x[rd] = (uint64_t)pc + 4;
-					pc = (char *)((uint64_t)pc + imm_j);
+					x[rd] = pc + 4;
+					// Note that imm_j already includes pc.  It's done that way for compatibility
+					// with GNU objdump.
+					pc = imm_j;
 					TRACE_RESULT_REG(rd);
-					break;
+					continue;
 				default:
 					crash(42);
 					errx(1, "unknown instruction %#010x (14..12=%d 6..2=%#x 1..0=%d)",
 					    instruction, PICK(instruction, 3, 12), PICK(instruction, 6, 2), PICK(instruction, 2, 0));
 				}
+				break;
 			}
 
 			pc += 4;
@@ -552,6 +562,7 @@ RUN(int *pcc, int argc, char **argv)
 				TRACE_OPCODE("c.ld");
 				TRACE_REG(rd_prime);
 				TRACE_IMM_REG(0, rs1_prime);
+				x[rd_prime] = *((uint64_t *)x[rs1_prime]);
 				// XXX: Offset
 				TRACE_RESULT_REG(rd_prime);
 				break;
@@ -564,8 +575,13 @@ RUN(int *pcc, int argc, char **argv)
 					TRACE_OPCODE("c.nop");
 					break;
 				} else {
+					int64_t nzimm;
+
 					TRACE_OPCODE("c.addi");
 					TRACE_REG(rd_rs1);
+					nzimm = (PICK(instruction, 1, 12) << 5) + PICK(instruction, 5, 2);
+					TRACE_IMM(nzimm);
+					x[rd_rs1] = x[rd_rs1] + nzimm;
 					// XXX: Offset
 					TRACE_RESULT_REG(rd_rs1);
 					break;
@@ -581,6 +597,7 @@ RUN(int *pcc, int argc, char **argv)
 						break;
 					}
 				}
+				break;
 			case OP_CLI:
 				TRACE_OPCODE("c.li");
 				TRACE_REG(rd_rs1);
@@ -588,11 +605,17 @@ RUN(int *pcc, int argc, char **argv)
 				break;
 			case OP_CADDI16SP_ET_AL:
 				if (rd_rs1 == 2) {
+					uint16_t nzimm;
+
 					TRACE_OPCODE("c.addi16sp");
-					TRACE_REG(2); // Implied.
+					nzimm = PICK(instruction, 1, 12) << 9 | PICK(instruction, 1, 6) << 4 | PICK(instruction, 1, 5) << 6 | PICK(instruction, 2, 3) << 7 | PICK(instruction, 1, 2) << 5;
+					TRACE_IMM(nzimm);
+					x[2] = x[2] + nzimm;
+					TRACE_RESULT_REG(2); // Implied.
 					break;
 				} else {
 					// c.lui
+					break;
 				}
 			case OP_CJ:
 				TRACE_OPCODE("c.j");
@@ -617,6 +640,7 @@ RUN(int *pcc, int argc, char **argv)
 						break;
 					} else {
 						TRACE_OPCODE("c.mv");
+						x[rd_rs1] = x[rs2];
 						TRACE_REG(rd_rs1);
 						TRACE_REG(rs2);
 						TRACE_RESULT_REG(rd_rs1);
